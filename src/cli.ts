@@ -5,10 +5,13 @@
  * Connects to the unit over WebSocket (--host / --port).
  * For Modbus RTU, use the library API directly with a Duplex serial stream.
  */
+import { createRequire } from 'module'
 import { Command, InvalidArgumentError } from 'commander'
 import { ValloxClient } from './client.js'
 import { WebSocketTransport } from './transport/websocket.js'
 import { Profile, Mode, HrCellStatus } from './types.js'
+
+const { version } = (createRequire(import.meta.url))('../package.json') as { version: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,15 +75,25 @@ const HR_CELL_LABELS: Record<number, string> = {
 }
 
 // ---------------------------------------------------------------------------
+// Banner
+// ---------------------------------------------------------------------------
+
+const BANNER = 'Vallox.js ventilation control CLI'
+
+// ---------------------------------------------------------------------------
 // Program
 // ---------------------------------------------------------------------------
 
 const program = new Command()
 
 program
+  .addHelpText('beforeAll', BANNER)
+  .hook('preAction', () => {
+    if (!program.opts<{ json: boolean }>().json) process.stdout.write(BANNER + '\n')
+  })
   .name('vallox')
   .description('Control a Vallox ventilation unit over WebSocket')
-  .version('1.0.0')
+  .version(version)
   .requiredOption('-H, --host <host>', 'hostname or IP address of the unit')
   .option('-p, --port <port>', 'WebSocket port (default: 80)', parseIntArg, 80)
   .option('--json', 'output as JSON')
