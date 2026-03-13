@@ -281,7 +281,7 @@ await client.setDeviceTime(new Date())
 ### Raw register access
 
 ```typescript
-import { Registers } from 'arnell/vallox.js'
+import { Registers } from 'vallox.js'
 
 await client.readRegister(Registers.FAN_SPEED)
 await client.writeRegister(Registers.HOME_SPEED, 70)
