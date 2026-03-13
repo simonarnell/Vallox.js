@@ -1,0 +1,55 @@
+{
+  "name": "vallox.js",
+  "version": "1.0.0",
+  "description": "TypeScript library for Vallox ventilation units",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "vallox": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simonarnell/vallox.js.git"
+  },
+  "keywords": [
+    "Vallox",
+    "Ventilation",
+    "IoT",
+    "Modbus",
+    "WebSocket"
+  ],
+  "author": "Simon Arnell",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/simonarnell/vallox.js/issues"
+  },
+  "homepage": "https://github.com/simonarnell/vallox.js#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "ws": "^7.3.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/ws": "^8.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.0"
+  }
+}
