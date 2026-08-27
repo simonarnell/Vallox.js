@@ -4,3 +4,6 @@
 src/
 jest.config.js
 tsconfig.json
+docs/
+typedoc.json
+dist/__tests__/

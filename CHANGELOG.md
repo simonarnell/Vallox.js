@@ -21,7 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm run docs` — generates HTML API documentation from source JSDoc comments via
   TypeDoc (see `typedoc.json`). Run through a pinned `npx` TypeDoc/TypeScript pair
   rather than as a devDependency, since the project's own `typescript` (`^7.0.2`)
-  doesn't yet expose the Compiler API TypeDoc needs.
+  doesn't yet expose the Compiler API TypeDoc needs. The generated `docs/` output and
+  `typedoc.json` are excluded from the published package via `.npmignore`.
+
+### Fixed
+
+- Published package included compiled test files (`dist/__tests__/**`, with
+  sourcemaps) — dead weight for consumers, now excluded via `.npmignore`.
 
 ### Security
 
