@@ -192,6 +192,30 @@ modeCmd.command('set')
   })
 
 // ---------------------------------------------------------------------------
+// serial
+// ---------------------------------------------------------------------------
+
+program.command('serial')
+  .description("Read the unit's serial number")
+  .action(async () => {
+    const opts = program.opts<{ host: string; port: number; json: boolean }>()
+    const serial = await makeClient(opts).getSerialNumber()
+    output(serial, opts.json)
+  })
+
+// ---------------------------------------------------------------------------
+// uptime
+// ---------------------------------------------------------------------------
+
+program.command('uptime')
+  .description("Read the unit's cumulative and current-session runtime")
+  .action(async () => {
+    const opts = program.opts<{ host: string; port: number; json: boolean }>()
+    const uptime = await makeClient(opts).getUptime()
+    output(uptime, opts.json)
+  })
+
+// ---------------------------------------------------------------------------
 // sensors
 // ---------------------------------------------------------------------------
 
@@ -465,6 +489,23 @@ filterCmd.command('changed')
       process.exit(1)
     }
     await makeClient(opts).setFilterChanged(date)
+    output('ok', opts.json)
+  })
+
+filterCmd.command('interval')
+  .description('Get the filter change interval in days')
+  .action(async () => {
+    const opts = program.opts<{ host: string; port: number; json: boolean }>()
+    const days = await makeClient(opts).getFilterChangeInterval()
+    output(opts.json ? days : `${days} days`, opts.json)
+  })
+
+filterCmd.command('set-interval')
+  .description('Set the filter change interval in days')
+  .argument('<days>', 'interval in days', parseIntArg)
+  .action(async (days: number) => {
+    const opts = program.opts<{ host: string; port: number; json: boolean }>()
+    await makeClient(opts).setFilterChangeInterval(days)
     output('ok', opts.json)
   })
 

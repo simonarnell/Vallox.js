@@ -1,4 +1,4 @@
-import type { Transport, SensorReadings, FaultEntry, WeeklySchedule, ScheduleDay } from './types.js'
+import type { Transport, SensorReadings, FaultEntry, WeeklySchedule, ScheduleDay, UnitUptime } from './types.js'
 import { Mode, TimedMode, Profile, HrCellStatus, FAULT_DESCRIPTIONS } from './types.js'
 import { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE, faultCodeRegister, faultActivityRegister } from './registers.js'
 
@@ -7,6 +7,9 @@ export { TimedMode }
 
 /** Number of hours in a day (registers per day in the weekly schedule). */
 const HOURS_PER_DAY = 24
+
+/** Number of hours in a year, used to combine TOTAL_UP_TIME_YEARS/HOURS into a single hour count. */
+const HOURS_PER_YEAR = 8760
 
 /**
  * Returns true when a register value is a non-zero ScheduleSlot (1, 2, or 3).
@@ -211,6 +214,35 @@ export class ValloxClient {
 
       default:
         throw new TypeError(`"${profile}" is not a valid Profile value`)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Unit identity
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the unit's serial number as a hex string (e.g. "0x96752ecd"),
+   * assembled from the SERIAL_NUMBER_MSW/LSW register pair.
+   */
+  async getSerialNumber(): Promise<string> {
+    const [msw, lsw] = await Promise.all([
+      this.#transport.readRegister(Registers.SERIAL_NUMBER_MSW),
+      this.#transport.readRegister(Registers.SERIAL_NUMBER_LSW),
+    ])
+    return `0x${msw.toString(16).padStart(4, '0')}${lsw.toString(16).padStart(4, '0')}`
+  }
+
+  /** Returns the unit's cumulative and current-session runtime, in hours. */
+  async getUptime(): Promise<UnitUptime> {
+    const [years, hours, currentHours] = await Promise.all([
+      this.#transport.readRegister(Registers.TOTAL_UP_TIME_YEARS),
+      this.#transport.readRegister(Registers.TOTAL_UP_TIME_HOURS),
+      this.#transport.readRegister(Registers.CURRENT_UP_TIME_HOURS),
+    ])
+    return {
+      totalHours: years * HOURS_PER_YEAR + hours,
+      currentSessionHours: currentHours,
     }
   }
 
@@ -477,6 +509,16 @@ export class ValloxClient {
   /** Returns the number of days remaining until the filter needs changing. */
   async getFilterDaysRemaining(): Promise<number> {
     return this.#transport.readRegister(Registers.REMAINING_FILTER_DAYS)
+  }
+
+  /** Returns the configured filter change interval, in days. */
+  async getFilterChangeInterval(): Promise<number> {
+    return this.#transport.readRegister(Registers.FILTER_CHANGE_INTERVAL)
+  }
+
+  /** Sets the filter change interval. @param days Interval in days. */
+  async setFilterChangeInterval(days: number): Promise<void> {
+    await this.#transport.writeRegister(Registers.FILTER_CHANGE_INTERVAL, days)
   }
 
   /**

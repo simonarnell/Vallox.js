@@ -345,6 +345,17 @@ Output is written to `dist/`.
 npm test
 ```
 
+### API documentation
+
+```bash
+npm run docs
+```
+
+Generates HTML API docs from the JSDoc comments in `src/` into `docs/` (see `typedoc.json`).
+This runs TypeDoc via `npx` against a pinned TypeDoc/TypeScript pair rather than as a
+project devDependency: the project's own `typescript` is pinned to an early 7.x preview
+that doesn't yet expose the Compiler API TypeDoc depends on.
+
 ### Publishing
 
 1. Bump the version in `package.json`

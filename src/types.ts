@@ -140,6 +140,14 @@ export interface SensorReadings {
   co2: number
 }
 
+/** Cumulative and current-session runtime of the ventilation unit. */
+export interface UnitUptime {
+  /** Total lifetime runtime, in hours. */
+  totalHours: number
+  /** Runtime since the unit's most recent power-on, in hours. */
+  currentSessionHours: number
+}
+
 /** A single fault entry from the unit's fault log. */
 export interface FaultEntry {
   /** Zero-based fault index (0–9). */

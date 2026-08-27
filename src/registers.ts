@@ -37,6 +37,16 @@ export function faultActivityRegister(n: number): number {
 
 export const Registers = {
   // -------------------------------------------------------------------------
+  // Unit identity (unit_info region, 1–35)
+  // -------------------------------------------------------------------------
+
+  /** Serial number, most significant word (read-only). Combine with SERIAL_NUMBER_LSW. */
+  SERIAL_NUMBER_MSW: 14,
+
+  /** Serial number, least significant word (read-only). Combine with SERIAL_NUMBER_MSW. */
+  SERIAL_NUMBER_LSW: 15,
+
+  // -------------------------------------------------------------------------
   // Sensor readings (hardware state region, 4352–4394)
   // -------------------------------------------------------------------------
 
@@ -115,6 +125,15 @@ export const Registers = {
    * 0 = heat recovery, 1 = cool recovery, 2 = bypass, 3 = defrost.
    */
   HR_CELL_STATUS: 4616,
+
+  /** Total lifetime runtime in whole years (read-only). Combine with TOTAL_UP_TIME_HOURS. */
+  TOTAL_UP_TIME_YEARS: 4617,
+
+  /** Total lifetime runtime, hours within the current year (read-only). Combine with TOTAL_UP_TIME_YEARS. */
+  TOTAL_UP_TIME_HOURS: 4618,
+
+  /** Runtime since the unit's most recent power-on, in hours (read-only). */
+  CURRENT_UP_TIME_HOURS: 4619,
 
   /** Remaining days until filter change required (read-only). */
   REMAINING_FILTER_DAYS: 4620,
@@ -237,6 +256,9 @@ export const Registers = {
 
   /** Filter changed year as a 2-digit offset from 2000 (e.g. 26 for 2026). */
   FILTER_CHANGED_YEAR: 20548,
+
+  /** Filter change interval in days (read/write). */
+  FILTER_CHANGE_INTERVAL: 20537,
 
   /** Boost timer enabled (0=disabled, 1=enabled). */
   BOOST_TIMER_ENABLED: 21766,

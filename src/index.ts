@@ -19,5 +19,6 @@ export type {
   ScheduleSlot,
   WebSocketTransportConfig,
   HistorySample,
+  UnitUptime,
 } from './types.js'
 export { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE } from './registers.js'

@@ -54,6 +54,41 @@ describe('temperature conversion', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Unit identity
+// ---------------------------------------------------------------------------
+
+describe('ValloxClient – unit identity', () => {
+  it('getSerialNumber assembles a hex string from the MSW/LSW register pair', async () => {
+    const transport = makeMockTransport({
+      [Registers.SERIAL_NUMBER_MSW]: 0x9675,
+      [Registers.SERIAL_NUMBER_LSW]: 0x2ecd,
+    })
+    const serial = await new ValloxClient(transport).getSerialNumber()
+    expect(serial).toBe('0x96752ecd')
+  })
+
+  it('getSerialNumber zero-pads short words', async () => {
+    const transport = makeMockTransport({
+      [Registers.SERIAL_NUMBER_MSW]: 0x1,
+      [Registers.SERIAL_NUMBER_LSW]: 0xab,
+    })
+    const serial = await new ValloxClient(transport).getSerialNumber()
+    expect(serial).toBe('0x000100ab')
+  })
+
+  it('getUptime combines years and hours into a single hour count', async () => {
+    const transport = makeMockTransport({
+      [Registers.TOTAL_UP_TIME_YEARS]: 1,
+      [Registers.TOTAL_UP_TIME_HOURS]: 100,
+      [Registers.CURRENT_UP_TIME_HOURS]: 29,
+    })
+    const uptime = await new ValloxClient(transport).getUptime()
+    expect(uptime.totalHours).toBe(8860)  // 1*8760 + 100
+    expect(uptime.currentSessionHours).toBe(29)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Power
 // ---------------------------------------------------------------------------
 
@@ -559,6 +594,17 @@ describe('ValloxClient – filter maintenance', () => {
     const year = call![1][2]
     expect(year).toBeGreaterThanOrEqual(before.getFullYear() - 2000)
     expect(year).toBeLessThanOrEqual(after.getFullYear() - 2000)
+  })
+
+  it('getFilterChangeInterval reads FILTER_CHANGE_INTERVAL register', async () => {
+    const transport = makeMockTransport({ [Registers.FILTER_CHANGE_INTERVAL]: 180 })
+    expect(await new ValloxClient(transport).getFilterChangeInterval()).toBe(180)
+  })
+
+  it('setFilterChangeInterval writes FILTER_CHANGE_INTERVAL register', async () => {
+    const transport = makeMockTransport()
+    await new ValloxClient(transport).setFilterChangeInterval(90)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.FILTER_CHANGE_INTERVAL, 90)
   })
 })
 

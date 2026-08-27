@@ -19,7 +19,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "docs": "npx --yes --package typedoc@0.28.20 --package typescript@5.9.3 -- typedoc"
   },
   "repository": {
     "type": "git",
