@@ -138,7 +138,7 @@ export const Registers = {
   /** Current month (1–12). */
   MONTH: 4852,
 
-  /** Current year (e.g. 2024). */
+  /** Current year as a 2-digit offset from 2000 (e.g. 26 for 2026). */
   YEAR: 4853,
 
   /** Current weekday (1=Monday, 7=Sunday). */
@@ -235,7 +235,7 @@ export const Registers = {
   /** Filter changed month (1–12). */
   FILTER_CHANGED_MONTH: 20547,
 
-  /** Filter changed year. */
+  /** Filter changed year as a 2-digit offset from 2000 (e.g. 26 for 2026). */
   FILTER_CHANGED_YEAR: 20548,
 
   /** Boost timer enabled (0=disabled, 1=enabled). */

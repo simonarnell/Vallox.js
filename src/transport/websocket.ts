@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import type { Transport, WebSocketTransportConfig } from '../types.js'
+import type { HistoryChannel, HistorySample, Transport, WebSocketTransportConfig } from '../types.js'
 
 /** Total number of uint16 values in a READ_TABLES response. */
 const WS_BUFFER_SIZE = 705
@@ -9,6 +9,30 @@ const WS_COMMAND_READ_TABLES = 246
 
 /** WebSocket command: write one or more register values. */
 const WS_COMMAND_WRITE_DATA = 249
+
+/**
+ * WebSocket command: dump the unit's raw per-minute history log buffers.
+ * Reverse-engineered from the unit's own web UI (`WS_WEB_UI_COMMAND_LOG_RAW`
+ * in its `bundle.js`) — undocumented in the Modbus RTU manual.
+ */
+const WS_COMMAND_LOG_RAW = 243
+
+/**
+ * Size in bytes of one history log page/channel buffer. The unit sends up to
+ * 7 pages back-to-back in a single message: one ring buffer per channel, each
+ * holding up to 8192 eight-byte records (~5.7 days at one-minute resolution).
+ * Page byte offsets are [0,1,2,3,4,5,8] * LOG_PAGE_SIZE (index 6 is skipped —
+ * confirmed against the unit's own web UI source, which reserves it for a
+ * variant airflow-diagnostics channel not present on all units/configs).
+ */
+const LOG_PAGE_SIZE = 65536
+const LOG_PAGE_OFFSETS = [0, 1, 2, 3, 4, 5, 8].map((i) => i * LOG_PAGE_SIZE)
+
+/** Byte size of one history log record: [channel, minute, hour, day, month, year, valueLo, valueHi]. */
+const LOG_RECORD_SIZE = 8
+
+/** Record channel byte value marking "no more records" for the rest of a page. */
+const LOG_END_MARKER = 255
 
 /**
  * Describes one contiguous block of Modbus registers within the WS response buffer.
@@ -118,13 +142,20 @@ export class WebSocketTransport implements Transport {
   // ---------------------------------------------------------------------------
 
   /**
-   * Builds a binary WebSocket frame as an ArrayBuffer containing big-endian uint16 values.
+   * Builds a binary WebSocket frame as an ArrayBuffer.
    *
    * For READ_TABLES:
    *   [3, 246, 0, checksum]  (4 words)
    *
    * For WRITE_DATA with N address/value pairs:
    *   [N*2+2, 249, addr0, val0, ..., addrN, valN, checksum]
+   *
+   * Every word in the request — length/command envelope, register address/value
+   * data words, and the trailing checksum — is little-endian (confirmed by
+   * capturing a real WRITE_DATA frame from the unit's own web UI: register
+   * address 4609 was encoded as bytes `01 12`, i.e. little-endian 0x1201, not
+   * big-endian 0x0112). This differs from READ_TABLES *responses*, whose sensor
+   * data words are big-endian — the two directions use different byte orders.
    *
    * Writes directly into a DataView in a single pass, accumulating the checksum
    * as each word is placed, then writes the checksum word last.
@@ -145,12 +176,12 @@ export class WebSocketTransport implements Transport {
 
     let checksum = 0
     for (const [i, word] of payload.entries()) {
-      dv.setUint16(i * 2, word, false /* big-endian */)
+      dv.setUint16(i * 2, word, true /* little-endian */)
       checksum = (checksum + word) & 0xffff
     }
 
-    // Checksum occupies the final word.
-    dv.setUint16((wordCount - 1) * 2, checksum, false /* big-endian */)
+    // Checksum occupies the final word (little-endian, part of the envelope).
+    dv.setUint16((wordCount - 1) * 2, checksum, true /* little-endian */)
 
     return ab
   }
@@ -162,11 +193,15 @@ export class WebSocketTransport implements Transport {
   /**
    * Sends a frame to the unit and resolves with the raw response ArrayBuffer.
    *
+   * Most commands reply with a single message, but LOG_RAW replies with two
+   * (a small ack, then the bulk data) — `messageIndex` (0-based) picks which
+   * one to resolve with; the connection stays open and collecting until then.
+   *
    * The WebSocket connection is closed automatically via a `using` declaration
    * (TS 5.2 / ES2025 Symbol.dispose) once the awaited response promise settles,
    * keeping resource cleanup declarative and separate from message handling.
    */
-  async #sendFrame(frame: ArrayBuffer): Promise<ArrayBuffer> {
+  async #sendFrame(frame: ArrayBuffer, messageIndex = 0): Promise<ArrayBuffer> {
     const url = `ws://${this.#host}:${this.#port}/`
     const ws = new WebSocket(url)
     ws.binaryType = 'arraybuffer'
@@ -176,11 +211,15 @@ export class WebSocketTransport implements Transport {
     using _ws = { [Symbol.dispose](): void { ws.close() } } satisfies Disposable
 
     return await new Promise<ArrayBuffer>((resolve, reject) => {
+      let messagesSeen = 0
+
       ws.on('open', () => {
         ws.send(Buffer.from(frame))
       })
 
       ws.on('message', (data: WebSocket.RawData) => {
+        if (messagesSeen++ !== messageIndex) return
+
         if (data instanceof ArrayBuffer) {
           resolve(data)
         } else if (Buffer.isBuffer(data)) {
@@ -281,5 +320,53 @@ export class WebSocketTransport implements Transport {
     const frame = this.#buildFrame(WS_COMMAND_WRITE_DATA, pairs)
     await this.#sendFrame(frame)
     this.#invalidateCache()
+  }
+
+  // ---------------------------------------------------------------------------
+  // History log (WS-only; undocumented in the Modbus RTU manual)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetches and decodes the unit's full history log: several weeks of
+   * periodic sensor/state samples (10-minute intervals observed on a real
+   * unit; ~6700+ samples per channel) across all logged channels.
+   *
+   * Each channel is stored in its own fixed-size ring buffer, so returned
+   * samples are in on-device write order, NOT chronological order — that
+   * order wraps mid-array once the buffer has filled and started overwriting
+   * its oldest entries. Sort by `timestamp` if you need them in time order.
+   *
+   * WS-only — not part of the Modbus RTU register map, so this lives on
+   * `WebSocketTransport` rather than the generic `Transport` interface.
+   */
+  async getHistory(): Promise<HistorySample[]> {
+    const frame = this.#buildFrame(WS_COMMAND_LOG_RAW, [])
+    // LOG_RAW replies with a small ack first, then the bulk log data as a
+    // second message — messageIndex 1 waits for that second message.
+    const raw = await this.#sendFrame(frame, 1)
+    const buf = new Uint8Array(raw)
+
+    const samples: HistorySample[] = []
+    for (const pageOffset of LOG_PAGE_OFFSETS) {
+      const pageEnd = Math.min(pageOffset + LOG_PAGE_SIZE, buf.length)
+      for (let i = pageOffset; i + LOG_RECORD_SIZE <= pageEnd; i += LOG_RECORD_SIZE) {
+        const channel = buf[i]
+        if (channel === LOG_END_MARKER) break // no more records on this page
+
+        const minute = buf[i + 1]
+        const hour = buf[i + 2]
+        const day = buf[i + 3]
+        const month = buf[i + 4]
+        const year = buf[i + 5]
+        const value = buf[i + 6] | (buf[i + 7] << 8) // little-endian, as confirmed for all WS data words
+
+        samples.push({
+          channel: channel as HistoryChannel,
+          timestamp: new Date(2000 + year, month - 1, day, hour, minute),
+          value,
+        })
+      }
+    }
+    return samples
   }
 }

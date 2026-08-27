@@ -9,6 +9,7 @@ export {
   HrCellStatus,
   TempControlMethod,
   FAULT_DESCRIPTIONS,
+  HistoryChannel,
 } from './types.js'
 export type {
   SensorReadings,
@@ -17,5 +18,6 @@ export type {
   ScheduleDay,
   ScheduleSlot,
   WebSocketTransportConfig,
+  HistorySample,
 } from './types.js'
 export { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE } from './registers.js'

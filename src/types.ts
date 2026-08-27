@@ -9,6 +9,44 @@ export interface Transport {
   writeRegisters(address: number, values: readonly number[]): Promise<void>
 }
 
+/**
+ * Named history log channels, as recorded in the unit's internal per-minute log
+ * buffers (WS transport only — reverse-engineered from the unit's own web UI,
+ * not part of the documented Modbus RTU register map).
+ *
+ * Temperature channels (0–3) are in centikelvin, matching the live sensor
+ * registers; the rest are raw values (ppm, %, RPM, etc.) with no conversion.
+ */
+export const HistoryChannel = {
+  EXTRACT_AIR_TEMP: 0,
+  EXHAUST_AIR_TEMP: 1,
+  OUTDOOR_AIR_TEMP: 2,
+  SUPPLY_AIR_TEMP: 3,
+  MAX_CO2: 4,
+  MAX_HUMIDITY: 5,
+  SUPPLY_CELL_AIR_TEMP: 6,
+  METRICS_1: 7,
+  FAN_SPEED: 8,
+  SUPPLY_IO: 9,
+  EXTRACT_IO: 10,
+  SUPPLY_RPM: 11,
+  EXTRACT_RPM: 12,
+  CELL_STATE: 13,
+  EXTR_REFERENCE: 14,
+  SUPPLY_AIRFLOW: 15,
+  EXTRACT_AIRFLOW: 16,
+} as const satisfies Record<string, number>
+export type HistoryChannel = typeof HistoryChannel[keyof typeof HistoryChannel]
+
+/** One logged sample from the unit's history buffers. */
+export interface HistorySample {
+  channel: HistoryChannel
+  /** Minute-resolution timestamp reconstructed from the unit's clock at log time. */
+  timestamp: Date
+  /** Raw register value; see `HistoryChannel` doc for units/conversion. */
+  value: number
+}
+
 /** Basic ventilation mode: Home (0) or Away (1). */
 export const Mode = { HOME: 0, AWAY: 1 } as const satisfies Record<string, number>
 export type Mode = typeof Mode[keyof typeof Mode]

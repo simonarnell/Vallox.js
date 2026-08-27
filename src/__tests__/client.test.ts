@@ -543,11 +543,9 @@ describe('ValloxClient – filter maintenance', () => {
 
   it('setFilterChanged writes date components to correct registers', async () => {
     const transport = makeMockTransport()
-    const date = new Date(2024, 2, 15)  // 15 March 2024 (month is 0-based)
+    const date = new Date(2026, 2, 15)  // 15 March 2026 (month is 0-based)
     await new ValloxClient(transport).setFilterChanged(date)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.FILTER_CHANGED_DAY, 15)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.FILTER_CHANGED_MONTH, 3)  // 1-based
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.FILTER_CHANGED_YEAR, 2024)
+    expect(transport.writeRegisters).toHaveBeenCalledWith(Registers.FILTER_CHANGED_DAY, [15, 3, 26])  // day, month (1-based), year (2-digit offset from 2000)
   })
 
   it('setFilterChanged defaults to today when no date given', async () => {
@@ -556,10 +554,11 @@ describe('ValloxClient – filter maintenance', () => {
     await new ValloxClient(transport).setFilterChanged()
     const after = new Date()
 
-    const calls = (transport.writeRegister as jest.Mock).mock.calls as [number, number][]
-    const yearCall = calls.find((c) => c[0] === Registers.FILTER_CHANGED_YEAR)
-    expect(yearCall![1]).toBeGreaterThanOrEqual(before.getFullYear())
-    expect(yearCall![1]).toBeLessThanOrEqual(after.getFullYear())
+    const calls = (transport.writeRegisters as jest.Mock).mock.calls as [number, number[]][]
+    const call = calls.find((c) => c[0] === Registers.FILTER_CHANGED_DAY)
+    const year = call![1][2]
+    expect(year).toBeGreaterThanOrEqual(before.getFullYear() - 2000)
+    expect(year).toBeLessThanOrEqual(after.getFullYear() - 2000)
   })
 })
 
@@ -647,14 +646,14 @@ describe('ValloxClient – weekly schedule', () => {
 describe('ValloxClient – device time', () => {
   it('getDeviceTime assembles a Date from clock registers', async () => {
     const transport = makeMockTransport({
-      [Registers.YEAR]:   2024,
+      [Registers.YEAR]:   26,   // 2-digit offset from 2000
       [Registers.MONTH]:  3,    // March (1-based)
       [Registers.DAY]:    15,
       [Registers.HOUR]:   14,
       [Registers.MINUTE]: 30,
     })
     const date = await new ValloxClient(transport).getDeviceTime()
-    expect(date.getFullYear()).toBe(2024)
+    expect(date.getFullYear()).toBe(2026)
     expect(date.getMonth()).toBe(2)     // 0-based: March = 2
     expect(date.getDate()).toBe(15)
     expect(date.getHours()).toBe(14)
@@ -663,39 +662,42 @@ describe('ValloxClient – device time', () => {
 
   it('setDeviceTime writes all clock registers', async () => {
     const transport = makeMockTransport()
-    const date = new Date(2024, 2, 15, 14, 30)  // Friday 15 March 2024 14:30
+    const date = new Date(2026, 2, 15, 14, 30)  // Sunday 15 March 2026 14:30
     await new ValloxClient(transport).setDeviceTime(date)
 
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.YEAR, 2024)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.MONTH, 3)  // 1-based
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.DAY, 15)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.HOUR, 14)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.MINUTE, 30)
+    // minute, hour, day, month, year (2-digit offset from 2000), weekday
+    expect(transport.writeRegisters).toHaveBeenCalledWith(Registers.MINUTE, [30, 14, 15, 3, 26, 7])
   })
 
   it('setDeviceTime converts Sunday (JS=0) to weekday 7', async () => {
     const transport = makeMockTransport()
-    // Sunday 17 March 2024
-    const sunday = new Date(2024, 2, 17, 10, 0)
+    // Sunday 15 March 2026
+    const sunday = new Date(2026, 2, 15, 10, 0)
     expect(sunday.getDay()).toBe(0)  // sanity check: JS says 0 for Sunday
     await new ValloxClient(transport).setDeviceTime(sunday)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.WEEKDAY, 7)
+    const calls = (transport.writeRegisters as jest.Mock).mock.calls as [number, number[]][]
+    const call = calls.find((c) => c[0] === Registers.MINUTE)
+    expect(call![1][5]).toBe(7)
   })
 
   it('setDeviceTime converts Monday (JS=1) to weekday 1', async () => {
     const transport = makeMockTransport()
-    const monday = new Date(2024, 2, 18, 10, 0)  // Monday 18 March 2024
+    const monday = new Date(2026, 2, 16, 10, 0)  // Monday 16 March 2026
     expect(monday.getDay()).toBe(1)  // sanity check
     await new ValloxClient(transport).setDeviceTime(monday)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.WEEKDAY, 1)
+    const calls = (transport.writeRegisters as jest.Mock).mock.calls as [number, number[]][]
+    const call = calls.find((c) => c[0] === Registers.MINUTE)
+    expect(call![1][5]).toBe(1)
   })
 
   it('setDeviceTime converts Saturday (JS=6) to weekday 6', async () => {
     const transport = makeMockTransport()
-    const saturday = new Date(2024, 2, 16, 10, 0)  // Saturday 16 March 2024
+    const saturday = new Date(2026, 2, 14, 10, 0)  // Saturday 14 March 2026
     expect(saturday.getDay()).toBe(6)
     await new ValloxClient(transport).setDeviceTime(saturday)
-    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.WEEKDAY, 6)
+    const calls = (transport.writeRegisters as jest.Mock).mock.calls as [number, number[]][]
+    const call = calls.find((c) => c[0] === Registers.MINUTE)
+    expect(call![1][5]).toBe(6)
   })
 })
 

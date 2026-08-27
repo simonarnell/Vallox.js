@@ -485,10 +485,12 @@ export class ValloxClient {
    */
   async setFilterChanged(date?: Date): Promise<void> {
     const d = date ?? new Date()
-    await Promise.all([
-      this.#transport.writeRegister(Registers.FILTER_CHANGED_DAY, d.getDate()),
-      this.#transport.writeRegister(Registers.FILTER_CHANGED_MONTH, d.getMonth() + 1),
-      this.#transport.writeRegister(Registers.FILTER_CHANGED_YEAR, d.getFullYear()),
+    // FILTER_CHANGED_DAY, _MONTH, _YEAR are contiguous; write them in one frame
+    // so the unit sees a single atomic update instead of racing connections.
+    await this.#transport.writeRegisters(Registers.FILTER_CHANGED_DAY, [
+      d.getDate(),
+      d.getMonth() + 1,
+      d.getFullYear() - 2000,
     ])
   }
 
@@ -574,7 +576,8 @@ export class ValloxClient {
     ])
 
     // month is 1-based from unit, Date constructor expects 0-based
-    return new Date(year, month - 1, day, hour, minute)
+    // year is stored as a 2-digit offset from 2000 (e.g. 26 for 2026)
+    return new Date(2000 + year, month - 1, day, hour, minute)
   }
 
   /**
@@ -587,13 +590,15 @@ export class ValloxClient {
     const jsDay = date.getDay() // 0=Sun, 6=Sat
     const unitDay = jsDay === 0 ? 7 : jsDay // 1=Mon, 7=Sun
 
-    await Promise.all([
-      this.#transport.writeRegister(Registers.MINUTE, date.getMinutes()),
-      this.#transport.writeRegister(Registers.HOUR, date.getHours()),
-      this.#transport.writeRegister(Registers.DAY, date.getDate()),
-      this.#transport.writeRegister(Registers.MONTH, date.getMonth() + 1),
-      this.#transport.writeRegister(Registers.YEAR, date.getFullYear()),
-      this.#transport.writeRegister(Registers.WEEKDAY, unitDay),
+    // MINUTE..WEEKDAY are contiguous (4849-4854); write them in one frame so the
+    // unit sees a single atomic update instead of six racing connections.
+    await this.#transport.writeRegisters(Registers.MINUTE, [
+      date.getMinutes(),
+      date.getHours(),
+      date.getDate(),
+      date.getMonth() + 1,
+      date.getFullYear() - 2000,
+      unitDay,
     ])
   }
 

@@ -59,8 +59,14 @@ vallox -H 192.168.1.100 time set          # sync to now
 vallox -H 192.168.1.100 register read 4608
 vallox -H 192.168.1.100 register write 4608 50
 
+# History log (WS transport only — several weeks of periodic samples per channel)
+vallox -H 192.168.1.100 history
+vallox -H 192.168.1.100 history --channel EXTRACT_AIR_TEMP
+vallox -H 192.168.1.100 history --csv > history.csv   # wide format: one row per timestamp, one column per channel
+
 # Machine-readable output
-vallox -H 192.168.1.100 --json sensors
+
+
 ```
 
 ### Command reference
@@ -89,8 +95,9 @@ vallox -H 192.168.1.100 --json sensors
 | `time get\|set [ISO8601]` | Read or set the unit's internal clock |
 | `register read <addr>` | Read a raw register by decimal address |
 | `register write <addr> <val>` | Write a raw register |
+| `history [-c <channel>] [--csv]` | Read the history log (WS only); `--csv` outputs one row per timestamp, one column per channel |
 
-Pass `--json` to any command for machine-readable output.
+Pass `--json` to any command for machine-readable output. `history` also accepts `--csv` (mutually exclusive with `--json`) for a wide-format CSV export.
 
 ## Library usage
 
@@ -286,6 +293,28 @@ import { Registers } from 'vallox.js'
 await client.readRegister(Registers.FAN_SPEED)
 await client.writeRegister(Registers.HOME_SPEED, 70)
 ```
+
+### History log (WS transport only)
+
+Not part of the documented Modbus RTU register map — reverse-engineered from
+the unit's own web UI. Available directly on `WebSocketTransport` (there's no
+equivalent over Modbus RTU, so it isn't exposed through `ValloxClient`).
+
+```typescript
+import { WebSocketTransport, HistoryChannel } from 'vallox.js'
+
+const transport = new WebSocketTransport({ host: '192.168.1.100', port: 80 })
+const samples = await transport.getHistory()
+// [{ channel: HistoryChannel.EXTRACT_AIR_TEMP, timestamp: Date, value: 29815 }, ...]
+```
+
+Each channel is a fixed-size ring buffer (several weeks of periodic samples,
+10-minute intervals observed on a real unit), so samples come back in
+on-device write order, not chronological order — sort by `timestamp` if you
+need them in time order. Temperature channels (`EXTRACT_AIR_TEMP`,
+`EXHAUST_AIR_TEMP`, `OUTDOOR_AIR_TEMP`, `SUPPLY_AIR_TEMP`) are in
+centikelvin, matching the live sensor registers; the rest (`MAX_CO2`,
+`MAX_HUMIDITY`, `FAN_SPEED`, RPM/airflow channels, etc.) are raw values.
 
 ## Maintenance
 

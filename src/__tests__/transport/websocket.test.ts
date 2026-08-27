@@ -36,13 +36,14 @@ function buildReadTablesResponse(overrides: Record<number, number> = {}): ArrayB
 }
 
 /**
- * Parses the frame ArrayBuffer sent by the transport into an array of uint16 words
- * (little-endian, as the WS protocol uses).
+ * Parses a request frame built by `#buildFrame` into an array of uint16 words.
+ * Every word in a request frame is little-endian (see `#buildFrame`).
  */
 function parseFrame(data: Buffer): number[] {
+  const wordCount = data.length / 2
   const words: number[] = []
-  for (let i = 0; i + 1 < data.length; i += 2) {
-    words.push(data.readUInt16BE(i))
+  for (let i = 0; i < wordCount; i++) {
+    words.push(data.readUInt16LE(i * 2))
   }
   return words
 }
@@ -284,6 +285,139 @@ describe('WebSocketTransport – WRITE_DATA frame', () => {
     const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
     await expect(transport.writeRegisters(4609, [])).resolves.toBeUndefined()
     expect(MockWebSocket).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LOG_RAW / history
+// ---------------------------------------------------------------------------
+
+describe('WebSocketTransport – getHistory', () => {
+  beforeEach(() => { MockWebSocket.mockClear() })
+
+  /** Builds one 8-byte LOG_RAW record: [channel, minute, hour, day, month, year, valueLo, valueHi]. */
+  function buildRecord(channel: number, minute: number, hour: number, day: number, month: number, year: number, value: number): number[] {
+    return [channel, minute, hour, day, month, year, value & 0xff, (value >> 8) & 0xff]
+  }
+
+  /** Builds a LOG_RAW bulk-data buffer: `records` bytes, padded to `totalLength` with the 0xFF end marker. */
+  function buildLogBuffer(records: number[][], totalLength: number): ArrayBuffer {
+    const bytes = new Uint8Array(totalLength).fill(255)
+    bytes.set(records.flat(), 0)
+    return bytes.buffer
+  }
+
+  it('sends a 3-word (6-byte) LOG_RAW request frame', async () => {
+    let capturedBuf: Buffer | undefined
+    MockWebSocket.mockImplementation(function (this: any) {
+      this.binaryType = 'arraybuffer'
+      this.on = (ev: string, cb: Function) => {
+        if (ev === 'open') setImmediate(() => cb())
+        if (ev === 'message') this._msgCb = cb
+      }
+      this.send = (buf: Buffer) => {
+        capturedBuf = buf
+        setImmediate(() => {
+          this._msgCb?.(new ArrayBuffer(8))  // small ack
+          this._msgCb?.(buildLogBuffer([], 0))  // empty bulk data
+        })
+      }
+      this.close = jest.fn()
+    } as any)
+
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
+    await transport.getHistory()
+
+    const words = parseFrame(capturedBuf!)
+    expect(words.length).toBe(3)
+    expect(words[0]).toBe(2)    // length word (frame length - 1)
+    expect(words[1]).toBe(243)  // LOG_RAW command
+    const expectedChecksum = wsChecksum([words[0], words[1]])
+    expect(words[2]).toBe(expectedChecksum)
+  })
+
+  it('waits for the second message (bulk data), ignoring the first (ack)', async () => {
+    const record = buildRecord(0, 30, 14, 15, 3, 26, 29815)
+    MockWebSocket.mockImplementation(function (this: any) {
+      this.binaryType = 'arraybuffer'
+      this.on = (ev: string, cb: Function) => {
+        if (ev === 'open') setImmediate(() => cb())
+        if (ev === 'message') this._msgCb = cb
+      }
+      this.send = () => {
+        setImmediate(() => {
+          this._msgCb?.(new ArrayBuffer(8))  // ack — must be ignored
+          this._msgCb?.(buildLogBuffer([record], 65536))
+        })
+      }
+      this.close = jest.fn()
+    } as any)
+
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
+    const samples = await transport.getHistory()
+
+    expect(samples).toHaveLength(1)
+    expect(samples[0]).toEqual({
+      channel: 0,
+      timestamp: new Date(2026, 2, 15, 14, 30),
+      value: 29815,
+    })
+  })
+
+  it('decodes records from multiple channel pages', async () => {
+    const rec0 = buildRecord(0, 0, 12, 1, 1, 26, 29815)   // channel 0, page offset 0
+    const rec1 = buildRecord(1, 0, 12, 1, 1, 26, 100)     // channel 1, page offset 65536
+    MockWebSocket.mockImplementation(function (this: any) {
+      this.binaryType = 'arraybuffer'
+      this.on = (ev: string, cb: Function) => {
+        if (ev === 'open') setImmediate(() => cb())
+        if (ev === 'message') this._msgCb = cb
+      }
+      this.send = () => {
+        setImmediate(() => {
+          this._msgCb?.(new ArrayBuffer(8))
+          const bytes = new Uint8Array(2 * 65536).fill(255)
+          bytes.set(rec0, 0)
+          bytes.set(rec1, 65536)
+          this._msgCb?.(bytes.buffer)
+        })
+      }
+      this.close = jest.fn()
+    } as any)
+
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
+    const samples = await transport.getHistory()
+
+    expect(samples).toHaveLength(2)
+    expect(samples.map((s) => s.channel).sort()).toEqual([0, 1])
+    expect(samples.find((s) => s.channel === 1)?.value).toBe(100)
+  })
+
+  it('stops at the 0xFF end marker within a page, ignoring records after it', async () => {
+    const rec = buildRecord(0, 0, 12, 1, 1, 26, 1)
+    MockWebSocket.mockImplementation(function (this: any) {
+      this.binaryType = 'arraybuffer'
+      this.on = (ev: string, cb: Function) => {
+        if (ev === 'open') setImmediate(() => cb())
+        if (ev === 'message') this._msgCb = cb
+      }
+      this.send = () => {
+        setImmediate(() => {
+          this._msgCb?.(new ArrayBuffer(8))
+          const bytes = new Uint8Array(65536).fill(255)
+          bytes.set(rec, 0)  // one real record, then the rest of the page is 0xFF padding
+          // A record placed after the padding should never be reached.
+          bytes.set(buildRecord(0, 10, 12, 1, 1, 26, 2), 64)
+          this._msgCb?.(bytes.buffer)
+        })
+      }
+      this.close = jest.fn()
+    } as any)
+
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
+    const samples = await transport.getHistory()
+    expect(samples).toHaveLength(1)
+    expect(samples[0].value).toBe(1)
   })
 })
 

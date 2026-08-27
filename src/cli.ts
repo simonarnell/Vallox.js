@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { Command, InvalidArgumentError } from 'commander'
 import { ValloxClient } from './client.js'
 import { WebSocketTransport } from './transport/websocket.js'
-import { Profile, Mode, HrCellStatus } from './types.js'
+import { Profile, Mode, HrCellStatus, HistoryChannel } from './types.js'
 
 const { version } = (createRequire(import.meta.url))('../package.json') as { version: string }
 
@@ -44,6 +44,15 @@ function output(data: unknown, json: boolean): void {
 function makeClient(opts: { host: string; port: number }): ValloxClient {
   return new ValloxClient(new WebSocketTransport({ host: opts.host, port: opts.port }))
 }
+
+function makeTransport(opts: { host: string; port: number }): WebSocketTransport {
+  return new WebSocketTransport({ host: opts.host, port: opts.port })
+}
+
+/** Reverse lookup from HistoryChannel numeric value to its constant name. */
+const HISTORY_CHANNEL_NAMES: Record<number, string> = Object.fromEntries(
+  Object.entries(HistoryChannel).map(([name, value]) => [value, name]),
+)
 
 // ---------------------------------------------------------------------------
 // Const maps
@@ -89,7 +98,8 @@ const program = new Command()
 program
   .addHelpText('beforeAll', BANNER)
   .hook('preAction', () => {
-    if (!program.opts<{ json: boolean }>().json) process.stdout.write(BANNER + '\n')
+    // Suppress for machine-readable output modes so redirected output (e.g. `history --csv > file.csv`) stays clean.
+    if (!program.opts<{ json: boolean }>().json && !process.argv.includes('--csv')) process.stdout.write(BANNER + '\n')
   })
   .name('vallox')
   .description('Control a Vallox ventilation unit over WebSocket')
@@ -586,6 +596,79 @@ registerCmd.command('write')
     const opts = program.opts<{ host: string; port: number; json: boolean }>()
     await makeClient(opts).writeRegister(address, value)
     output('ok', opts.json)
+  })
+
+// ---------------------------------------------------------------------------
+// history (WS-only)
+// ---------------------------------------------------------------------------
+
+/** Local (unit-time) date as YYYY-MM-DD. */
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Local (unit-time) time as HH:mm — the unit's clock has no seconds resolution. */
+function localTimeStr(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Quotes a CSV field only if it contains a comma, quote, or newline. */
+function csvField(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+}
+
+program.command('history')
+  .description("Read the unit's history log (WS transport only; several weeks of periodic samples per channel)")
+  .option('-c, --channel <name>', 'only include one channel (e.g. EXTRACT_AIR_TEMP)')
+  .option('--csv', 'output as CSV, one row per timestamp with one column per channel')
+  .action(async (cmdOpts: { channel?: string; csv?: boolean }) => {
+    const opts = program.opts<{ host: string; port: number; json: boolean }>()
+    if (cmdOpts.csv && opts.json) {
+      console.error('--csv and --json are mutually exclusive')
+      process.exit(1)
+    }
+
+    const samples = await makeTransport(opts).getHistory()
+
+    const wantedChannel = cmdOpts.channel !== undefined
+      ? HistoryChannel[cmdOpts.channel.toUpperCase() as keyof typeof HistoryChannel]
+      : undefined
+    if (cmdOpts.channel !== undefined && wantedChannel === undefined) {
+      console.error(`Unknown channel: ${cmdOpts.channel}`)
+      process.exit(1)
+    }
+
+    const filtered = (wantedChannel === undefined ? samples : samples.filter((s) => s.channel === wantedChannel))
+      .slice()
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+
+    if (cmdOpts.csv) {
+      // Pivot to wide format: one row per timestamp, one column per channel present in the results.
+      const channelsPresent = [...new Set(filtered.map((s) => s.channel))].sort((a, b) => a - b)
+      const rowsByTimestamp = new Map<number, Map<number, number>>()
+      for (const s of filtered) {
+        const t = s.timestamp.getTime()
+        if (!rowsByTimestamp.has(t)) rowsByTimestamp.set(t, new Map())
+        rowsByTimestamp.get(t)!.set(s.channel, s.value)
+      }
+
+      console.log(['timestamp', ...channelsPresent.map((c) => csvField(HISTORY_CHANNEL_NAMES[c]))].join(','))
+      for (const [t, values] of [...rowsByTimestamp.entries()].sort((a, b) => a[0] - b[0])) {
+        const timestamp = `${localDateStr(new Date(t))} ${localTimeStr(new Date(t))}`
+        console.log([timestamp, ...channelsPresent.map((c) => values.get(c) ?? '')].join(','))
+      }
+    } else if (opts.json) {
+      output(filtered.map((s) => ({
+        date: localDateStr(s.timestamp),
+        time: localTimeStr(s.timestamp),
+        channel: HISTORY_CHANNEL_NAMES[s.channel],
+        value: s.value,
+      })), true)
+    } else {
+      for (const s of filtered) {
+        console.log(`${localDateStr(s.timestamp)}  ${localTimeStr(s.timestamp)}  ${HISTORY_CHANNEL_NAMES[s.channel]}  ${s.value}`)
+      }
+    }
   })
 
 // ---------------------------------------------------------------------------
