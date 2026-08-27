@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-27
+
 ### Added
 
 - `getSerialNumber()` / `vallox serial` — reads the unit's serial number from the
@@ -21,21 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than as a devDependency, since the project's own `typescript` (`^7.0.2`)
   doesn't yet expose the Compiler API TypeDoc needs.
 
-### Fixed
+### Security
 
-- **WebSocket transport returned all-zero sensor and register data.** `WebSocketTransport`
-  encoded the entire outgoing frame as big-endian, but the unit only accepts the
-  length/command envelope and checksum as little-endian (register data words are
-  big-endian); a big-endian envelope caused the unit to reject every request with a
-  short error frame, silently yielding all-zero readings (e.g. temperatures reported
-  as -273.15 °C). The frame builder now encodes the envelope/checksum as little-endian
-  and data words as big-endian, matching the unit's actual protocol. This also fixes
-  raw `register read`/`register write` access, which shares the same transport.
-- **`getDeviceTime()` reported the wrong century.** The unit's `YEAR` clock register
-  (and `FILTER_CHANGED_YEAR`) stores a 2-digit offset from 2000 (e.g. `26` for 2026),
-  not a full 4-digit year. `getDeviceTime()` passed the raw value straight to `Date`,
-  which misinterpreted it as 1926 instead of 2026. `getDeviceTime()`/`setDeviceTime()`
-  and `setFilterChanged()` now convert to/from the 2-digit representation correctly.
+- Bumped `ws` (the runtime WebSocket dependency used by `WebSocketTransport`) from
+  7.5.10 to 7.5.13, fixing a memory exhaustion DoS via tiny fragments and data chunks
+  ([GHSA-96hv-2xvq-fx4p](https://github.com/advisories/GHSA-96hv-2xvq-fx4p)).
+- Updated dev-only transitive dependencies (`@babel/*`, `browserslist`, `caniuse-lite`,
+  `js-yaml`, `picomatch`, `brace-expansion`, and others) via `npm audit fix`, resolving
+  several high-severity advisories (ReDoS/DoS) in the test/build toolchain. These do
+  not affect published package consumers.
 
 ## [1.0.0] - 2026-08-27
 
@@ -62,5 +58,6 @@ Initial release.
 - `vallox` CLI for direct shell use, covering all of the above, plus `--json` output
   and a WebSocket-only history log command (`history`, with CSV export).
 
-[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/simonarnell/vallox.js/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/simonarnell/vallox.js/releases/tag/v1.0.0
