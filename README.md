@@ -320,7 +320,7 @@ centikelvin, matching the live sensor registers; the rest (`MAX_CO2`,
 
 ### Prerequisites
 
-- Node.js >= 20
+- Node.js >= 24
 - npm
 
 ### Setup
