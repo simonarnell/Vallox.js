@@ -126,6 +126,7 @@ export class WebSocketTransport implements Transport {
   readonly #port: number
   readonly #cacheTtlMs: number
   #cache: Cache | null = null
+  #pendingFetch: Promise<Uint16Array> | null = null
 
   /**
    * @param config        Host and port of the Vallox unit.
@@ -251,15 +252,33 @@ export class WebSocketTransport implements Transport {
 
   /**
    * Returns a fresh or cached copy of the register buffer.
+   *
+   * Concurrent callers that all see a stale cache share a single in-flight
+   * fetch rather than each opening their own WebSocket connection — the
+   * unit's embedded web server can only handle a handful of simultaneous
+   * connections before it starts dropping them (observed as ECONNRESET /
+   * "socket hang up" under bursts of 10+ concurrent reads).
    */
   async #getCachedBuffer(): Promise<Uint16Array> {
     const now = Date.now()
     if (this.#cache !== null && now - this.#cache.timestamp < this.#cacheTtlMs) {
       return this.#cache.buffer
     }
-    const buffer = await this.#fetchAllRegisters()
-    this.#cache = { buffer, timestamp: now }
-    return buffer
+    if (this.#pendingFetch !== null) {
+      return this.#pendingFetch
+    }
+
+    const fetchPromise = this.#fetchAllRegisters()
+      .then((buffer) => {
+        this.#cache = { buffer, timestamp: Date.now() }
+        return buffer
+      })
+      .finally(() => {
+        this.#pendingFetch = null
+      })
+
+    this.#pendingFetch = fetchPromise
+    return fetchPromise
   }
 
   /** Invalidates the register cache, forcing the next read to re-fetch. */

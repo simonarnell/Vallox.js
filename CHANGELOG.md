@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   like `month=13` is rejected rather than silently rolling over into a wrong date). New
   `ValidationError` export from `src/validation.ts`.
 
+### Fixed
+
+- `WebSocketTransport` cache stampede: concurrent calls that all saw a stale register cache
+  each independently opened their own WebSocket connection to fetch it, rather than sharing
+  one in-flight fetch. Against real hardware, whose embedded web server can only handle a
+  handful of simultaneous connections, this caused `ECONNRESET`/"socket hang up" failures
+  under bursts of concurrent reads (observed: 5 concurrent → 1 failure, 20 concurrent → 14
+  failures) — easily triggered by any consumer issuing several `ValloxClient` calls at once.
+  Concurrent callers now share a single in-flight `READ_TABLES` fetch; verified against real
+  hardware with zero failures across 49 concurrent calls (bursts of 5/10/14/20) that
+  previously failed at every burst size.
+
 ## [1.1.0] - 2026-08-27
 
 ### Added

@@ -467,6 +467,21 @@ describe('WebSocketTransport – cache', () => {
     // 2 reads + 1 write = 3 WS connections
     expect(MockWebSocket).toHaveBeenCalledTimes(3)
   })
+
+  it('coalesces concurrent reads with a stale cache into a single WS connection', async () => {
+    const response = buildReadTablesResponse({ 107: 0x0001 })
+    setupMockWs(Buffer.from(response))
+
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 }, 5000)
+
+    // 10 concurrent reads all see a cold cache; without in-flight de-duplication
+    // each would open its own WS connection (the failure mode observed against
+    // real hardware, which can't handle many simultaneous connections).
+    const results = await Promise.all(Array.from({ length: 10 }, () => transport.readRegister(4609)))
+
+    expect(MockWebSocket).toHaveBeenCalledTimes(1)
+    expect(results).toEqual(new Array(10).fill(1))
+  })
 })
 
 // ---------------------------------------------------------------------------
