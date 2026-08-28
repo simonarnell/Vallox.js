@@ -1,6 +1,6 @@
 {
   "name": "vallox.js",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "TypeScript library for Vallox ventilation units",
   "type": "module",
   "main": "dist/index.js",
