@@ -1,0 +1,25 @@
+{
+  "$id": "vallox:sensor-readings",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sensor readings",
+  "type": "object",
+  "properties": {
+    "extractAirTemp": { "$ref": "vallox:temperature-celsius" },
+    "exhaustAirTemp": { "$ref": "vallox:temperature-celsius" },
+    "outdoorAirTemp": { "$ref": "vallox:temperature-celsius" },
+    "supplyCellAirTemp": { "$ref": "vallox:temperature-celsius" },
+    "supplyAirTemp": { "$ref": "vallox:temperature-celsius" },
+    "humidity": { "$ref": "vallox:humidity-percent" },
+    "co2": { "$ref": "vallox:co2-ppm" }
+  },
+  "required": [
+    "extractAirTemp",
+    "exhaustAirTemp",
+    "outdoorAirTemp",
+    "supplyCellAirTemp",
+    "supplyAirTemp",
+    "humidity",
+    "co2"
+  ],
+  "additionalProperties": false
+}

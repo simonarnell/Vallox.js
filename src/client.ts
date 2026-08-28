@@ -1,6 +1,16 @@
 import type { Transport, SensorReadings, FaultEntry, WeeklySchedule, ScheduleDay, UnitUptime } from './types.js'
 import { Mode, TimedMode, Profile, HrCellStatus, FAULT_DESCRIPTIONS } from './types.js'
 import { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE, faultCodeRegister, faultActivityRegister } from './registers.js'
+import {
+  validatePercentage,
+  validateTemperatureCelsius,
+  validateCo2Ppm,
+  validateFilterDays,
+  validateSensorReadings,
+  validateFaultEntries,
+  validateUnitUptime,
+  validateDeviceTimeComponents,
+} from './validation.js'
 
 // Re-export TimedMode so callers can import it from this module too.
 export { TimedMode }
@@ -240,10 +250,10 @@ export class ValloxClient {
       this.#transport.readRegister(Registers.TOTAL_UP_TIME_HOURS),
       this.#transport.readRegister(Registers.CURRENT_UP_TIME_HOURS),
     ])
-    return {
+    return validateUnitUptime({
       totalHours: years * HOURS_PER_YEAR + hours,
       currentSessionHours: currentHours,
-    }
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -273,7 +283,7 @@ export class ValloxClient {
       this.#transport.readRegister(Registers.CO2_VALUE),
     ])
 
-    return {
+    return validateSensorReadings({
       extractAirTemp: this.#cKToCelsius(extractRaw),
       exhaustAirTemp: this.#cKToCelsius(exhaustRaw),
       outdoorAirTemp: this.#cKToCelsius(outdoorRaw),
@@ -281,7 +291,7 @@ export class ValloxClient {
       supplyAirTemp: this.#cKToCelsius(supplyRaw),
       humidity,
       co2,
-    }
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -290,27 +300,33 @@ export class ValloxClient {
 
   /** Returns the Home profile fan speed as a percentage (0–100). */
   async getHomeFanSpeed(): Promise<number> {
-    return this.#transport.readRegister(Registers.HOME_SPEED)
+    return validatePercentage(await this.#transport.readRegister(Registers.HOME_SPEED), 'home fan speed')
   }
 
   /** Returns the Away profile fan speed as a percentage (0–100). */
   async getAwayFanSpeed(): Promise<number> {
-    return this.#transport.readRegister(Registers.AWAY_SPEED)
+    return validatePercentage(await this.#transport.readRegister(Registers.AWAY_SPEED), 'away fan speed')
   }
 
   /** Returns the Boost profile fan speed as a percentage (0–100). */
   async getBoostFanSpeed(): Promise<number> {
-    return this.#transport.readRegister(Registers.BOOST_SPEED)
+    return validatePercentage(await this.#transport.readRegister(Registers.BOOST_SPEED), 'boost fan speed')
   }
 
   /** Returns the Custom mode extract fan speed as a percentage (0–100). */
   async getCustomExtractFanSpeed(): Promise<number> {
-    return this.#transport.readRegister(Registers.CUSTOM_EXTRACT_SPEED)
+    return validatePercentage(
+      await this.#transport.readRegister(Registers.CUSTOM_EXTRACT_SPEED),
+      'custom extract fan speed',
+    )
   }
 
   /** Returns the Custom mode supply fan speed as a percentage (0–100). */
   async getCustomSupplyFanSpeed(): Promise<number> {
-    return this.#transport.readRegister(Registers.CUSTOM_SUPPLY_SPEED)
+    return validatePercentage(
+      await this.#transport.readRegister(Registers.CUSTOM_SUPPLY_SPEED),
+      'custom supply fan speed',
+    )
   }
 
   /** Sets the Home profile fan speed. @param percent 0–100. */
@@ -345,25 +361,25 @@ export class ValloxClient {
   /** Returns the Home profile supply air temperature setpoint in Celsius. */
   async getHomeSupplyTemp(): Promise<number> {
     const raw = await this.#transport.readRegister(Registers.HOME_SUPPLY_TEMP)
-    return this.#cKToCelsius(raw)
+    return validateTemperatureCelsius(this.#cKToCelsius(raw), 'home supply temperature setpoint')
   }
 
   /** Returns the Away profile supply air temperature setpoint in Celsius. */
   async getAwaySupplyTemp(): Promise<number> {
     const raw = await this.#transport.readRegister(Registers.AWAY_SUPPLY_TEMP)
-    return this.#cKToCelsius(raw)
+    return validateTemperatureCelsius(this.#cKToCelsius(raw), 'away supply temperature setpoint')
   }
 
   /** Returns the Boost profile supply air temperature setpoint in Celsius. */
   async getBoostSupplyTemp(): Promise<number> {
     const raw = await this.#transport.readRegister(Registers.BOOST_SUPPLY_TEMP)
-    return this.#cKToCelsius(raw)
+    return validateTemperatureCelsius(this.#cKToCelsius(raw), 'boost supply temperature setpoint')
   }
 
   /** Returns the Custom mode supply air temperature setpoint in Celsius. */
   async getCustomSupplyTemp(): Promise<number> {
     const raw = await this.#transport.readRegister(Registers.CUSTOM_SUPPLY_TEMP)
-    return this.#cKToCelsius(raw)
+    return validateTemperatureCelsius(this.#cKToCelsius(raw), 'custom supply temperature setpoint')
   }
 
   /** Sets the Home profile supply air temperature setpoint. @param celsius Target temperature. */
@@ -392,7 +408,7 @@ export class ValloxClient {
 
   /** Returns the RH threshold for automatic fan speed boost (percent). */
   async getRhThreshold(): Promise<number> {
-    return this.#transport.readRegister(Registers.RH_THRESHOLD)
+    return validatePercentage(await this.#transport.readRegister(Registers.RH_THRESHOLD), 'RH threshold')
   }
 
   /** Sets the RH threshold for automatic fan speed boost. @param percent 0–100. */
@@ -402,7 +418,7 @@ export class ValloxClient {
 
   /** Returns the CO2 threshold for automatic fan speed boost (PPM). */
   async getCo2Threshold(): Promise<number> {
-    return this.#transport.readRegister(Registers.CO2_THRESHOLD)
+    return validateCo2Ppm(await this.#transport.readRegister(Registers.CO2_THRESHOLD), 'CO2 threshold')
   }
 
   /** Sets the CO2 threshold for automatic fan speed boost. @param ppm CO2 level in PPM. */
@@ -490,7 +506,7 @@ export class ValloxClient {
       })
     }
 
-    return faults
+    return validateFaultEntries(faults)
   }
 
   /**
@@ -508,12 +524,18 @@ export class ValloxClient {
 
   /** Returns the number of days remaining until the filter needs changing. */
   async getFilterDaysRemaining(): Promise<number> {
-    return this.#transport.readRegister(Registers.REMAINING_FILTER_DAYS)
+    return validateFilterDays(
+      await this.#transport.readRegister(Registers.REMAINING_FILTER_DAYS),
+      'filter days remaining',
+    )
   }
 
   /** Returns the configured filter change interval, in days. */
   async getFilterChangeInterval(): Promise<number> {
-    return this.#transport.readRegister(Registers.FILTER_CHANGE_INTERVAL)
+    return validateFilterDays(
+      await this.#transport.readRegister(Registers.FILTER_CHANGE_INTERVAL),
+      'filter change interval',
+    )
   }
 
   /** Sets the filter change interval. @param days Interval in days. */
@@ -616,6 +638,11 @@ export class ValloxClient {
       this.#transport.readRegister(Registers.MONTH),
       this.#transport.readRegister(Registers.YEAR),
     ])
+
+    // Validate the raw components before constructing a Date: an out-of-range
+    // value (e.g. month=13) would otherwise silently roll over into a
+    // wrong-but-plausible-looking date instead of surfacing the bad read.
+    validateDeviceTimeComponents({ minute, hour, day, month, year })
 
     // month is 1-based from unit, Date constructor expects 0-based
     // year is stored as a 2-digit offset from 2000 (e.g. 26 for 2026)

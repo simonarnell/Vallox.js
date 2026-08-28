@@ -1,0 +1,13 @@
+{
+  "$id": "vallox:unit-uptime",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Unit uptime",
+  "description": "Cumulative and current-session runtime of the ventilation unit. Capped at 50 years of hours, well beyond any real unit's service life.",
+  "type": "object",
+  "properties": {
+    "totalHours": { "type": "integer", "minimum": 0, "maximum": 438000 },
+    "currentSessionHours": { "type": "integer", "minimum": 0, "maximum": 438000 }
+  },
+  "required": ["totalHours", "currentSessionHours"],
+  "additionalProperties": false
+}

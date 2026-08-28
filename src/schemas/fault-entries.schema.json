@@ -1,0 +1,8 @@
+{
+  "$id": "vallox:fault-entries",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Fault entries",
+  "type": "array",
+  "items": { "$ref": "vallox:fault-entry" },
+  "maxItems": 10
+}

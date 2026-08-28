@@ -1,0 +1,9 @@
+{
+  "$id": "vallox:percentage",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Percentage",
+  "description": "A percentage value (0-100). Register storage is a uint16 and can technically hold any value 0-65535, but only 0-100 is ever a valid percentage.",
+  "type": "integer",
+  "minimum": 0,
+  "maximum": 100
+}

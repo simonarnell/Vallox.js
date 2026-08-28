@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Semantic validation of data read from the unit, via JSON Schema (`src/schemas/*.schema.json`)
+  validated with `ajv`. Catches protocol decode bugs (wrong buffer offset, endianness, a
+  corrupted response) that would otherwise silently produce a nonsensical value — e.g. a
+  6000°C sensor reading, a >100% fan speed, or a 32nd day of the month — by throwing a
+  `ValidationError` instead. Applied to `getSensorReadings()`, the fan speed and supply
+  temperature setpoint getters, `getRhThreshold()`/`getCo2Threshold()`,
+  `getFilterDaysRemaining()`/`getFilterChangeInterval()`, `getFaults()`, `getUptime()`, and
+  `getDeviceTime()` (validated before constructing the `Date`, so an out-of-range component
+  like `month=13` is rejected rather than silently rolling over into a wrong date). New
+  `ValidationError` export from `src/validation.ts`.
+
 ## [1.1.0] - 2026-08-27
 
 ### Added

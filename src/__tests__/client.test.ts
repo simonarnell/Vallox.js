@@ -29,8 +29,16 @@ function makeMockTransport(registers: Record<number, number> = {}): jest.Mocked<
 
 describe('temperature conversion', () => {
   it('converts centikelvins to Celsius correctly', async () => {
-    // 27315 cK = 0 °C
-    const transport = makeMockTransport({ [Registers.EXTRACT_AIR_TEMP]: 27315 })
+    // 27315 cK = 0 °C. Other temp registers get a plausible baseline (20 °C)
+    // so the overall sensor readings object passes semantic validation —
+    // this test only cares about the extractAirTemp conversion.
+    const transport = makeMockTransport({
+      [Registers.EXTRACT_AIR_TEMP]: 27315,
+      [Registers.EXHAUST_AIR_TEMP]: 29315,
+      [Registers.OUTDOOR_AIR_TEMP]: 29315,
+      [Registers.SUPPLY_CELL_AIR_TEMP]: 29315,
+      [Registers.SUPPLY_AIR_TEMP]: 29315,
+    })
     const client = new ValloxClient(transport)
     const readings = await client.getSensorReadings()
     expect(readings.extractAirTemp).toBeCloseTo(0, 2)
@@ -45,8 +53,16 @@ describe('temperature conversion', () => {
   })
 
   it('converts negative temperatures correctly', async () => {
-    // -15 °C = 27315 - 1500 = 25815 cK
-    const transport = makeMockTransport({ [Registers.OUTDOOR_AIR_TEMP]: 25815 })
+    // -15 °C = 27315 - 1500 = 25815 cK. Other temp registers get a plausible
+    // baseline (20 °C) so the overall sensor readings object passes semantic
+    // validation — this test only cares about the outdoorAirTemp conversion.
+    const transport = makeMockTransport({
+      [Registers.OUTDOOR_AIR_TEMP]: 25815,
+      [Registers.EXTRACT_AIR_TEMP]: 29315,
+      [Registers.EXHAUST_AIR_TEMP]: 29315,
+      [Registers.SUPPLY_CELL_AIR_TEMP]: 29315,
+      [Registers.SUPPLY_AIR_TEMP]: 29315,
+    })
     const client = new ValloxClient(transport)
     const readings = await client.getSensorReadings()
     expect(readings.outdoorAirTemp).toBeCloseTo(-15, 2)
@@ -764,5 +780,70 @@ describe('ValloxClient – raw register access', () => {
     const client = new ValloxClient(transport)
     await client.writeRegister(1234, 99)
     expect(transport.writeRegister).toHaveBeenCalledWith(1234, 99)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Semantic validation (end-to-end: client method → validation.ts → thrown error)
+// ---------------------------------------------------------------------------
+
+describe('ValloxClient – semantic validation of device data', () => {
+  it('getHomeFanSpeed throws when the register holds an out-of-range percentage', async () => {
+    // Fan speed is a percentage; 250 is a technically-valid uint16 but not a real percentage.
+    const transport = makeMockTransport({ [Registers.HOME_SPEED]: 250 })
+    await expect(new ValloxClient(transport).getHomeFanSpeed()).rejects.toThrow(/home fan speed/)
+  })
+
+  it('getCo2Threshold throws when the register holds an implausible PPM value', async () => {
+    const transport = makeMockTransport({ [Registers.CO2_THRESHOLD]: 65000 })
+    await expect(new ValloxClient(transport).getCo2Threshold()).rejects.toThrow(/CO2 threshold/)
+  })
+
+  it('getSensorReadings throws when a temperature register decodes to an implausible value', async () => {
+    // Raw register 0 → (0 - 27315) / 100 = -273.15 °C: outside plausible bounds.
+    const transport = makeMockTransport({
+      [Registers.EXHAUST_AIR_TEMP]: 29315,
+      [Registers.OUTDOOR_AIR_TEMP]: 29315,
+      [Registers.SUPPLY_CELL_AIR_TEMP]: 29315,
+      [Registers.SUPPLY_AIR_TEMP]: 29315,
+      // EXTRACT_AIR_TEMP left unset → defaults to raw 0
+    })
+    await expect(new ValloxClient(transport).getSensorReadings()).rejects.toThrow(/sensor readings/)
+  })
+
+  it('getFilterDaysRemaining throws when the register holds an implausible day count', async () => {
+    const transport = makeMockTransport({ [Registers.REMAINING_FILTER_DAYS]: 60000 })
+    await expect(new ValloxClient(transport).getFilterDaysRemaining()).rejects.toThrow(/filter days remaining/)
+  })
+
+  it('getUptime throws when the combined hour count is implausibly large', async () => {
+    const transport = makeMockTransport({
+      [Registers.TOTAL_UP_TIME_YEARS]: 65535, // garbage: ~65,535 years
+      [Registers.TOTAL_UP_TIME_HOURS]: 0,
+      [Registers.CURRENT_UP_TIME_HOURS]: 0,
+    })
+    await expect(new ValloxClient(transport).getUptime()).rejects.toThrow(/unit uptime/)
+  })
+
+  it('getDeviceTime throws when the month register is out of range', async () => {
+    const transport = makeMockTransport({
+      [Registers.YEAR]: 26,
+      [Registers.MONTH]: 13, // invalid — would otherwise silently roll over to next year
+      [Registers.DAY]: 15,
+      [Registers.HOUR]: 14,
+      [Registers.MINUTE]: 30,
+    })
+    await expect(new ValloxClient(transport).getDeviceTime()).rejects.toThrow(/device clock/)
+  })
+
+  it('getDeviceTime throws when the day register is out of range', async () => {
+    const transport = makeMockTransport({
+      [Registers.YEAR]: 26,
+      [Registers.MONTH]: 3,
+      [Registers.DAY]: 32, // invalid — no month has 32 days
+      [Registers.HOUR]: 14,
+      [Registers.MINUTE]: 30,
+    })
+    await expect(new ValloxClient(transport).getDeviceTime()).rejects.toThrow(/device clock/)
   })
 })
