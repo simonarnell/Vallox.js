@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "vallox": "./dist/cli.js"
+    "vallox": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsc",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "docs": "npx --yes --package typedoc@0.28.20 --package typescript@5.9.3 -- typedoc"
+    "docs": "npx --yes --package typedoc@0.28.20 --package typescript@5.9.3 -- typedoc",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
