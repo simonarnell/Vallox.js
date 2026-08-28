@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-28
+
 ### Added
 
 - Semantic validation of data read from the unit, via JSON Schema (`src/schemas/*.schema.json`)
@@ -89,6 +91,7 @@ Initial release.
 - `vallox` CLI for direct shell use, covering all of the above, plus `--json` output
   and a WebSocket-only history log command (`history`, with CSV export).
 
-[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/simonarnell/vallox.js/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/simonarnell/vallox.js/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/simonarnell/vallox.js/releases/tag/v1.0.0
