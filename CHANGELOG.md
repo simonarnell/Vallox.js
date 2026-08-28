@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `ValidationError` (added in 1.2.0) was never re-exported from `src/index.ts`, so
+  consumers had no way to `instanceof`-check it despite the 1.2.0 changelog entry
+  saying it was exported. Now exported from the package root.
+
 ## [1.2.0] - 2026-08-28
 
 ### Added
