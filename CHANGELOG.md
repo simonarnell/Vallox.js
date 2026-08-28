@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-28
+
 ### Fixed
 
 - `ValidationError` (added in 1.2.0) was never re-exported from `src/index.ts`, so
@@ -97,7 +99,8 @@ Initial release.
 - `vallox` CLI for direct shell use, covering all of the above, plus `--json` output
   and a WebSocket-only history log command (`history`, with CSV export).
 
-[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/simonarnell/vallox.js/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/simonarnell/vallox.js/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/simonarnell/vallox.js/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/simonarnell/vallox.js/releases/tag/v1.0.0
