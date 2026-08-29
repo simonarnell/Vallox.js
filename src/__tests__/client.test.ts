@@ -102,6 +102,50 @@ describe('ValloxClient – unit identity', () => {
     expect(uptime.totalHours).toBe(8860)  // 1*8760 + 100
     expect(uptime.currentSessionHours).toBe(29)
   })
+
+  it('getModel looks up the machine model name from the raw register code', async () => {
+    const transport = makeMockTransport({ [Registers.MACHINE_MODEL]: 2 })
+    const model = await new ValloxClient(transport).getModel()
+    expect(model).toBe('Vallox 110 MV')
+  })
+
+  it('getModel returns undefined for an unrecognised code', async () => {
+    const transport = makeMockTransport({ [Registers.MACHINE_MODEL]: 9999 })
+    const model = await new ValloxClient(transport).getModel()
+    expect(model).toBeUndefined()
+  })
+
+  it('getMachineType looks up the type designation from the raw register code', async () => {
+    const transport = makeMockTransport({ [Registers.MACHINE_TYPE]: 19 })
+    const type = await new ValloxClient(transport).getMachineType()
+    expect(type).toBe('A3702')
+  })
+
+  it('getSoftwareVersion decodes byte-swapped words and trims leading zero components', async () => {
+    // Real-device capture: registers 2-10 (big-endian) = 0,0,0,0,0,0,0x0300,0x0100,0x0600
+    // Byte-swapped: 0,0,0,0,0,0,3,1,6 -> leading zeros trimmed -> "3.1.6"
+    const transport = makeMockTransport({
+      [Registers.APPL_SW_VERSION_START + 6]: 0x0300,
+      [Registers.APPL_SW_VERSION_START + 7]: 0x0100,
+      [Registers.APPL_SW_VERSION_START + 8]: 0x0600,
+    })
+    const version = await new ValloxClient(transport).getSoftwareVersion()
+    expect(version).toBe('3.1.6')
+  })
+
+  it('getSoftwareVersion returns undefined when all words are uninitialized (0xFFFF)', async () => {
+    const registers: Record<number, number> = {}
+    for (let i = 0; i < 9; i++) registers[Registers.APPL_SW_VERSION_START + i] = 0xffff
+    const transport = makeMockTransport(registers)
+    const version = await new ValloxClient(transport).getSoftwareVersion()
+    expect(version).toBeUndefined()
+  })
+
+  it('getSoftwareVersion falls back to all components when every word is zero', async () => {
+    const transport = makeMockTransport()
+    const version = await new ValloxClient(transport).getSoftwareVersion()
+    expect(version).toBe('0.0.0.0.0.0.0.0.0')
+  })
 })
 
 // ---------------------------------------------------------------------------

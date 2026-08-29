@@ -21,5 +21,6 @@ export type {
   HistorySample,
   UnitUptime,
 } from './types.js'
-export { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE } from './registers.js'
+export { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE, SW_VERSION_WORD_COUNT } from './registers.js'
+export { MACHINE_MODELS, MACHINE_TYPES } from './device-catalog.js'
 export { ValidationError } from './validation.js'

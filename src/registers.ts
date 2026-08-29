@@ -35,10 +35,40 @@ export function faultActivityRegister(n: number): number {
   return 36871 + (n - 1) * 6
 }
 
+/** Number of registers in the application software version block (see APPL_SW_VERSION_START). */
+export const SW_VERSION_WORD_COUNT = 9
+
 export const Registers = {
   // -------------------------------------------------------------------------
   // Unit identity (unit_info region, 1–35)
   // -------------------------------------------------------------------------
+
+  /**
+   * First of SW_VERSION_WORD_COUNT (9) consecutive registers holding the
+   * application software version (read-only). Each register is one version
+   * component (major, minor, patch, ...), byte-swapped, with leading
+   * all-zero components trimmed — e.g. registers reading (byte-swapped)
+   * [0,0,0,0,0,0,3,1,6] represent version "3.1.6". Reverse-engineered from
+   * the unit's own web UI (`A_CYC_APPL_SW_VERSION_1` / function `U()` in its
+   * `bundle.js`) — undocumented in the Modbus RTU manual.
+   */
+  APPL_SW_VERSION_START: 2,
+
+  /**
+   * Machine type code (read-only). Look up in `MACHINE_TYPES` (see
+   * device-catalog.ts) to get the type designation (e.g. "A3702").
+   * Reverse-engineered from the unit's own web UI — undocumented in the
+   * Modbus RTU manual.
+   */
+  MACHINE_TYPE: 16,
+
+  /**
+   * Machine model code (read-only). Look up in `MACHINE_MODELS` (see
+   * device-catalog.ts) to get the model name (e.g. "Vallox 110 MV").
+   * Reverse-engineered from the unit's own web UI — undocumented in the
+   * Modbus RTU manual.
+   */
+  MACHINE_MODEL: 17,
 
   /** Serial number, most significant word (read-only). Combine with SERIAL_NUMBER_LSW. */
   SERIAL_NUMBER_MSW: 14,

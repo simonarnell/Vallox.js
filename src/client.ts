@@ -1,6 +1,16 @@
 import type { Transport, SensorReadings, FaultEntry, WeeklySchedule, ScheduleDay, UnitUptime } from './types.js'
 import { Mode, TimedMode, Profile, HrCellStatus, FAULT_DESCRIPTIONS } from './types.js'
-import { Registers, MAX_FAULTS, POWER_ON, POWER_OFF, TIMER_INDEFINITE, faultCodeRegister, faultActivityRegister } from './registers.js'
+import {
+  Registers,
+  MAX_FAULTS,
+  POWER_ON,
+  POWER_OFF,
+  TIMER_INDEFINITE,
+  SW_VERSION_WORD_COUNT,
+  faultCodeRegister,
+  faultActivityRegister,
+} from './registers.js'
+import { MACHINE_MODELS, MACHINE_TYPES } from './device-catalog.js'
 import {
   validatePercentage,
   validateTemperatureCelsius,
@@ -53,6 +63,11 @@ export class ValloxClient {
   /** Converts degrees Celsius to centikelvins for register storage. */
   #celsiusToCK(celsius: number): number {
     return Math.round(celsius * 100 + 27315)
+  }
+
+  /** Swaps the high and low bytes of a 16-bit register value. */
+  #swap16(word: number): number {
+    return ((word & 0xff) << 8) | ((word >> 8) & 0xff)
   }
 
   // ---------------------------------------------------------------------------
@@ -241,6 +256,42 @@ export class ValloxClient {
       this.#transport.readRegister(Registers.SERIAL_NUMBER_LSW),
     ])
     return `0x${msw.toString(16).padStart(4, '0')}${lsw.toString(16).padStart(4, '0')}`
+  }
+
+  /**
+   * Returns the unit's model name (e.g. "Vallox 110 MV"), looked up from the
+   * raw MACHINE_MODEL register code via `MACHINE_MODELS`. Returns undefined
+   * if the code is not in the lookup table.
+   */
+  async getModel(): Promise<string | undefined> {
+    const code = await this.#transport.readRegister(Registers.MACHINE_MODEL)
+    return MACHINE_MODELS[code]
+  }
+
+  /**
+   * Returns the unit's type designation (e.g. "A3702"), looked up from the
+   * raw MACHINE_TYPE register code via `MACHINE_TYPES`. Returns undefined
+   * if the code is not in the lookup table.
+   */
+  async getMachineType(): Promise<string | undefined> {
+    const code = await this.#transport.readRegister(Registers.MACHINE_TYPE)
+    return MACHINE_TYPES[code]
+  }
+
+  /**
+   * Returns the unit's application software version (e.g. "3.1.6"), read
+   * from the APPL_SW_VERSION_START register block. Returns undefined if the
+   * unit reports the block as uninitialized (all words 0xFFFF).
+   */
+  async getSoftwareVersion(): Promise<string | undefined> {
+    const raw = await this.#transport.readRegisters(Registers.APPL_SW_VERSION_START, SW_VERSION_WORD_COUNT)
+    const words = Array.from(raw, (word) => this.#swap16(word))
+
+    if (words.every((word) => word === 0xffff)) return undefined
+
+    const firstNonZero = words.findIndex((word) => word !== 0)
+    const components = firstNonZero === -1 ? words : words.slice(firstNonZero)
+    return components.join('.')
   }
 
   /** Returns the unit's cumulative and current-session runtime, in hours. */
