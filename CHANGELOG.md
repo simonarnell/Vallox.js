@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-30
+
+### Added
+
+- `ValloxClient.getModel()`, `getMachineType()`, and `getSoftwareVersion()`, exposing the
+  unit's model name (e.g. "Vallox 110 MV"), type designation (e.g. "A3702"), and application
+  software version (e.g. "3.1.6") — the same fields shown on the unit's own dashboard info
+  page. Reverse-engineered from the unit's web UI (`bundle.js`), undocumented in the Modbus
+  RTU manual. Backed by new `Registers.MACHINE_MODEL`/`MACHINE_TYPE`/`APPL_SW_VERSION_START`
+  addresses and new `MACHINE_MODELS`/`MACHINE_TYPES` lookup tables exported from
+  `device-catalog.ts`.
+
 ## [1.2.1] - 2026-08-28
 
 ### Fixed
