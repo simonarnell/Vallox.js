@@ -92,6 +92,15 @@ describe('ValloxClient – unit identity', () => {
     expect(serial).toBe('0x000100ab')
   })
 
+  it('getSerialNumberDecimal assembles a decimal string from the MSW/LSW register pair', async () => {
+    const transport = makeMockTransport({
+      [Registers.SERIAL_NUMBER_MSW]: 0x9675,
+      [Registers.SERIAL_NUMBER_LSW]: 0x2ecd,
+    })
+    const serial = await new ValloxClient(transport).getSerialNumberDecimal()
+    expect(serial).toBe('2524262093')
+  })
+
   it('getUptime combines years and hours into a single hour count', async () => {
     const transport = makeMockTransport({
       [Registers.TOTAL_UP_TIME_YEARS]: 1,

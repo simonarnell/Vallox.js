@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ValloxClient.getSerialNumberDecimal()`, returning the same serial number as
+  `getSerialNumber()` but formatted as decimal (e.g. "2524262093") rather than hex, matching
+  how the unit's own dashboard displays it.
+
 ## [1.3.0] - 2026-08-30
 
 ### Added

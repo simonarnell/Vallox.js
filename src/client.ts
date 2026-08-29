@@ -259,6 +259,20 @@ export class ValloxClient {
   }
 
   /**
+   * Returns the unit's serial number as a decimal string (e.g. "2524262093"),
+   * assembled from the SERIAL_NUMBER_MSW/LSW register pair. Same underlying
+   * value as `getSerialNumber()`, just formatted the way the unit's own
+   * dashboard ("Unit information" page) displays it, rather than as hex.
+   */
+  async getSerialNumberDecimal(): Promise<string> {
+    const [msw, lsw] = await Promise.all([
+      this.#transport.readRegister(Registers.SERIAL_NUMBER_MSW),
+      this.#transport.readRegister(Registers.SERIAL_NUMBER_LSW),
+    ])
+    return (msw * 0x10000 + lsw).toString(10)
+  }
+
+  /**
    * Returns the unit's model name (e.g. "Vallox 110 MV"), looked up from the
    * raw MACHINE_MODEL register code via `MACHINE_MODELS`. Returns undefined
    * if the code is not in the lookup table.
