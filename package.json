@@ -1,6 +1,6 @@
 {
   "name": "vallox.js",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "TypeScript library for Vallox ventilation units",
   "type": "module",
   "main": "dist/index.js",
@@ -23,7 +23,12 @@
   },
   "scripts": {
     "build": "tsc",
+    "pretest": "npm run build",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
+    "pretest:hardware": "npm run build",
+    "test:hardware": "node --experimental-vm-modules node_modules/.bin/jest --config jest.hardware.config.js",
+    "test:report": "node scripts/report-test-coverage.mjs",
     "docs": "npx --yes --package typedoc@0.28.20 --package typescript@5.9.3 -- typedoc",
     "prepublishOnly": "npm run build"
   },

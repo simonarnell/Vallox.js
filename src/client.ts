@@ -94,13 +94,15 @@ export class ValloxClient {
   // Basic mode (Home / Away)
   // ---------------------------------------------------------------------------
 
-  /** Returns the current basic mode (Home or Away). */
+  /** Returns the current basic mode (Home, Away, or Automatic). */
   async getMode(): Promise<Mode> {
     const value = await this.#transport.readRegister(Registers.HOME_AWAY)
-    return value === Mode.AWAY ? Mode.AWAY : Mode.HOME
+    if (value === Mode.AWAY) return Mode.AWAY
+    if (value === Mode.AUTOMATIC) return Mode.AUTOMATIC
+    return Mode.HOME
   }
 
-  /** Sets the basic ventilation mode to Home or Away. Does not clear timed overrides. */
+  /** Sets the basic ventilation mode to Home, Away, or Automatic. Does not clear timed overrides. */
   async setMode(mode: Mode): Promise<void> {
     await this.#transport.writeRegister(Registers.HOME_AWAY, mode)
   }
@@ -181,12 +183,13 @@ export class ValloxClient {
    * Returns the current Profile, matching the semantics of the original JS API.
    *
    * Priority order:
-   *  1. BOOST  – if boost timer > 0
-   *  2. FIREPLACE – if custom timer > 0
-   *  3. EXTRA  – if programmable timer > 0
-   *  4. AWAY   – if mode register is Away
-   *  5. HOME   – if mode register is Home
-   *  6. NONE   – fallback
+   *  1. BOOST     – if boost timer > 0
+   *  2. CUSTOM    – if custom timer > 0 (same profile as the deprecated FIREPLACE)
+   *  3. EXTRA     – if programmable timer > 0
+   *  4. AWAY      – if mode register is Away
+   *  5. AUTOMATIC – if mode register is Automatic
+   *  6. HOME      – if mode register is Home
+   *  7. NONE      – fallback
    */
   async getProfile(): Promise<Profile> {
     const [state, boostTimer, customTimer, extraTimer] = await Promise.all([
@@ -197,9 +200,10 @@ export class ValloxClient {
     ])
 
     if (boostTimer > 0) return Profile.BOOST
-    if (customTimer > 0) return Profile.FIREPLACE
+    if (customTimer > 0) return Profile.CUSTOM
     if (extraTimer > 0) return Profile.EXTRA
     if (state === Mode.AWAY) return Profile.AWAY
+    if (state === Mode.AUTOMATIC) return Profile.AUTOMATIC
     if (state === Mode.HOME) return Profile.HOME
     return Profile.NONE
   }
@@ -207,8 +211,8 @@ export class ValloxClient {
   /**
    * Sets the ventilation profile.
    *
-   * For HOME/AWAY: clears all timed overrides and sets the base mode.
-   * For BOOST/FIREPLACE/EXTRA: activates the corresponding timed mode.
+   * For HOME/AWAY/AUTOMATIC: clears all timed overrides and sets the base mode.
+   * For BOOST/CUSTOM(/FIREPLACE)/EXTRA: activates the corresponding timed mode.
    *
    * @param profile         The desired Profile.
    * @param durationMinutes Optional duration in minutes for timed profiles.
@@ -225,11 +229,17 @@ export class ValloxClient {
         await this.setMode(Mode.AWAY)
         break
 
+      case Profile.AUTOMATIC:
+        await this.clearTimedModes()
+        await this.setMode(Mode.AUTOMATIC)
+        break
+
       case Profile.BOOST:
         await this.setBoostMode(durationMinutes)
         break
 
-      case Profile.FIREPLACE:
+      // Profile.CUSTOM and Profile.FIREPLACE are the same value (4) — see the Profile doc comment.
+      case Profile.CUSTOM:
         await this.setCustomMode(durationMinutes)
         break
 

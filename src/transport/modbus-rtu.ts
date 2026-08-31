@@ -126,6 +126,12 @@ export class ModbusRtuTransport implements Transport {
       let timer: ReturnType<typeof setTimeout> | null = null
 
       const cleanup = (): void => {
+        // istanbul ignore else -- cleanup() runs from exactly one settlement path
+        // (onData, onError, the timeout callback, or a synchronous write() throw),
+        // each of which settles the promise and removes these listeners, so a
+        // second call reaching `timer === null` isn't reachable through the
+        // public API. Guarded defensively rather than assumed, in case that
+        // invariant ever changes.
         if (timer !== null) {
           clearTimeout(timer)
           timer = null

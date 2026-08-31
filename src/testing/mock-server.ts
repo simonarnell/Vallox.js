@@ -184,7 +184,13 @@ export class MockValloxServer {
     const wss = this.#wss
     if (!wss) return
     await new Promise<void>((resolve, reject) => {
-      wss.close((err) => (err ? reject(err) : resolve()))
+      wss.close((err) =>
+        /* istanbul ignore next -- ws's Server.close() doesn't error for any reachable
+           usage of this class (verified: even concurrent stop() calls both resolve
+           cleanly); this is a defensive handler for an error path ws's own types
+           allow but this class can't actually trigger. */
+        err ? reject(err) : resolve(),
+      )
       for (const client of wss.clients) client.terminate()
     })
     this.#wss = undefined
@@ -222,6 +228,11 @@ export class MockValloxServer {
 
   #handleConnection(ws: WebSocket): void {
     ws.on('message', (data: Buffer) => {
+      // istanbul ignore next -- the `ws` server always hands binary messages to this
+      // handler as a Buffer, never a raw ArrayBuffer; this class never sets
+      // `ws.binaryType` on a connection, which is the only thing that would change
+      // that. Kept as a type-safe fallback for `WebSocket.RawData`'s wider type, not
+      // because the else branch is reachable in practice.
       const words = parseFrame(Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer))
       const command = words[1]
 
@@ -256,6 +267,10 @@ export class MockValloxServer {
     for (const region of WS_REGIONS) {
       for (let addr = region.rangeStart + 1; addr <= region.rangeEnd; addr++) {
         const idx = addressToBufferIndex(addr)
+        // istanbul ignore else -- addr is drawn from `region`'s own (rangeStart,
+        // rangeEnd] by this loop, so addressToBufferIndex(addr) always resolves
+        // within that same region; idx < 0 can't happen given this call site,
+        // even though the function's own signature allows it generally.
         if (idx >= 0) buffer[idx] = this.#registers.get(addr) ?? 0
       }
     }
@@ -263,6 +278,9 @@ export class MockValloxServer {
     const ab = new ArrayBuffer(WS_BUFFER_SIZE * 2)
     const dv = new DataView(ab)
     for (let i = 0; i < WS_BUFFER_SIZE; i++) {
+      // istanbul ignore next -- i is always a valid index into this fixed-size,
+      // just-allocated `buffer` (0..WS_BUFFER_SIZE-1), so it's always defined;
+      // the `?? 0` is a type-level safety net, not a reachable runtime path.
       dv.setUint16(i * 2, buffer[i] ?? 0, false /* big-endian, matching a real response */)
     }
     return ab

@@ -318,6 +318,29 @@ describe('ModbusRtuTransport – readRegister', () => {
 
     await expect(responsePromise).rejects.toThrow('serial port disconnected')
   })
+
+  it('rejects when stream.write() throws synchronously', async () => {
+    const stream = new Duplex({
+      read() {},
+      write() {
+        throw new Error('port not open')
+      },
+    })
+    const transport = new ModbusRtuTransport(stream, 1)
+
+    await expect(transport.readRegister(4609)).rejects.toThrow('port not open')
+  })
+
+  it('uses default unit address (1) and timeout (1000ms) when omitted', async () => {
+    const { stream, written, respond } = makeFakeStream()
+    const transport = new ModbusRtuTransport(stream) // no unitAddress/timeoutMs
+
+    const responsePromise = transport.readRegister(4609)
+    setImmediate(() => respond(buildReadResponse(1, [42])))
+    expect(await responsePromise).toBe(42)
+
+    expect(new Uint8Array(written[0])[0]).toBe(1) // default unit address
+  })
 })
 
 describe('ModbusRtuTransport – readRegisters', () => {
@@ -352,6 +375,22 @@ describe('ModbusRtuTransport – readRegisters', () => {
     })
 
     await expect(responsePromise).rejects.toThrow(/byte count mismatch/i)
+  })
+
+  it('rejects when response function code is neither FC03 nor an exception', async () => {
+    const { stream, respond } = makeFakeStream()
+    const transport = new ModbusRtuTransport(stream, 1)
+
+    // 1-register read → expectedBytes = 7. FC=0x04 (no error bit, wrong function code).
+    const responsePromise = transport.readRegister(4609)
+    setImmediate(() => {
+      const frame = new Uint8Array(7)
+      frame[0] = 1
+      frame[1] = 0x04
+      respond(frame)
+    })
+
+    await expect(responsePromise).rejects.toThrow(/unexpected function code/i)
   })
 })
 
@@ -414,6 +453,22 @@ describe('ModbusRtuTransport – writeRegister', () => {
 
     await expect(writePromise).rejects.toThrow(/CRC/i)
   })
+
+  it('rejects when write response function code is neither FC06 nor an exception', async () => {
+    const { stream, respond } = makeFakeStream()
+    const transport = new ModbusRtuTransport(stream, 1)
+
+    // writeRegister expects 8 bytes; FC=0x07 (no error bit, wrong function code).
+    const writePromise = transport.writeRegister(4609, 1)
+    setImmediate(() => {
+      const frame = new Uint8Array(8)
+      frame[0] = 1
+      frame[1] = 0x07
+      respond(frame)
+    })
+
+    await expect(writePromise).rejects.toThrow(/unexpected function code/i)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -467,6 +522,32 @@ describe('ModbusRtuTransport – writeRegisters', () => {
     })
 
     await expect(p).rejects.toThrow(/exception/i)
+  })
+
+  it('rejects when FC16 response unit address mismatches', async () => {
+    const { stream, respond } = makeFakeStream()
+    const transport = new ModbusRtuTransport(stream, 1)
+
+    const p = transport.writeRegisters(4609, [1, 2])
+    setImmediate(() => respond(buildWriteMultipleResponse(2, 4609, 2)))  // wrong addr
+
+    await expect(p).rejects.toThrow(/unit address mismatch/i)
+  })
+
+  it('rejects when FC16 response function code is neither FC16 nor an exception', async () => {
+    const { stream, respond } = makeFakeStream()
+    const transport = new ModbusRtuTransport(stream, 1)
+
+    // FC16 response is always 8 bytes; FC=0x11 (no error bit, wrong function code).
+    const p = transport.writeRegisters(4609, [1, 2])
+    setImmediate(() => {
+      const frame = new Uint8Array(8)
+      frame[0] = 1
+      frame[1] = 0x11
+      respond(frame)
+    })
+
+    await expect(p).rejects.toThrow(/unexpected function code/i)
   })
 
   it('handles chunked data delivery (bytes arriving in multiple events)', async () => {

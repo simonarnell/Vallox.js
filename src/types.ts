@@ -47,8 +47,15 @@ export interface HistorySample {
   value: number
 }
 
-/** Basic ventilation mode: Home (0) or Away (1). */
-export const Mode = { HOME: 0, AWAY: 1 } as const satisfies Record<string, number>
+/**
+ * Basic ventilation mode: Home (0), Away (1), or Automatic (2) — the unit
+ * dynamically adjusts fan speed itself rather than following a fixed
+ * per-mode setting. Automatic was added in unit firmware 3.1.4; reverse-
+ * engineered from a live unit's WebSocket traffic (STATE register write of
+ * 2), since neither the Modbus RTU manual nor the firmware changelog
+ * document its register encoding.
+ */
+export const Mode = { HOME: 0, AWAY: 1, AUTOMATIC: 2 } as const satisfies Record<string, number>
 export type Mode = typeof Mode[keyof typeof Mode]
 
 /** Named timed override modes. */
@@ -62,6 +69,13 @@ export type TimedMode = typeof TimedMode[keyof typeof TimedMode]
 /**
  * Profile const for backward compatibility with the original API.
  * Maps to Mode and timed modes internally.
+ *
+ * `FIREPLACE` and `CUSTOM` are the same profile (value 4) under two names:
+ * the unit's own firmware renamed "Fireplace" to "Custom" in 2.0.20, and its
+ * current web UI/app only ever say "Custom" — `CUSTOM` is the name that
+ * matches what's on screen today. `FIREPLACE` is kept, unchanged, for
+ * backward compatibility with the original `homebridge-vallox` API this
+ * library's `Profile` numbering was modeled on.
  */
 export const Profile = {
   NONE: 0,
@@ -69,7 +83,13 @@ export const Profile = {
   AWAY: 2,
   BOOST: 3,
   FIREPLACE: 4,
+  CUSTOM: 4,
   EXTRA: 5,
+  /**
+   * Added in unit firmware 3.1.4. See {@link Mode.AUTOMATIC} for how it's
+   * encoded on the wire.
+   */
+  AUTOMATIC: 6,
 } as const satisfies Record<string, number>
 export type Profile = typeof Profile[keyof typeof Profile]
 

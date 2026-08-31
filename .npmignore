@@ -3,6 +3,11 @@
 .gitignore
 src/
 jest.config.js
+jest.hardware.config.js
+jest.strip-types-transformer.cjs
+scripts/
+coverage/
+coverage-hardware/
 tsconfig.json
 docs/
 typedoc.json

@@ -160,6 +160,12 @@ describe('WebSocketTransport – buffer index mapping', () => {
     const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
     await expect(transport.readRegister(0)).rejects.toThrow(/not in any known WS buffer region/)
   })
+
+  it('readRegisters throws for an address not in any region', async () => {
+    setupMockWs(buildReadTablesResponse())
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
+    await expect(transport.readRegisters(99999, 1)).rejects.toThrow(/not in any known WS buffer region/)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -499,5 +505,22 @@ describe('WebSocketTransport – error handling', () => {
     setupMockWs(null, new Error('connection refused'))
     const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
     await expect(transport.writeRegister(4609, 1)).rejects.toThrow('connection refused')
+  })
+
+  it('rejects when a message arrives as neither ArrayBuffer nor Buffer', async () => {
+    MockWebSocket.mockImplementation(function (this: any) {
+      this.binaryType = 'arraybuffer'
+      this.on = (ev: string, cb: Function) => {
+        if (ev === 'open') setImmediate(() => cb())
+        if (ev === 'message') this._msgCb = cb
+      }
+      this.send = () => {
+        setImmediate(() => this._msgCb?.('unexpected string payload'))
+      }
+      this.close = jest.fn()
+    } as any)
+
+    const transport = new WebSocketTransport({ host: '192.168.1.1', port: 80 })
+    await expect(transport.readRegister(4609)).rejects.toThrow('Unexpected WebSocket message type')
   })
 })

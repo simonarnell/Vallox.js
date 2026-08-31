@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-08-31
+
+### Added
+
+- `Mode.AUTOMATIC` and `Profile.AUTOMATIC`, supporting the "Automatic" ventilation mode added in unit firmware 3.1.4. The unit dynamically adjusts fan speed itself rather than following a fixed per-mode setting. Reverse-engineered from a live unit's WebSocket traffic (capturing the WRITE_DATA frame sent when selecting "Automatic" in the unit's own web UI) — encoded as `HOME_AWAY` (STATE) register value `2`, alongside the existing Home (0) and Away (1). Neither the Modbus RTU manual nor Vallox's firmware changelog document the register encoding, only that the feature exists.
+- `Profile.CUSTOM`, an alias for the existing `Profile.FIREPLACE` (same value, 4) matching the name the unit's own firmware and web UI/app have used since 2.0.20 ("Fireplace mode is renamed to Custom"). `vallox.js` already used "Custom" internally (`setCustomMode()`, `CUSTOM_TIMER`, etc.) — only the `Profile` enum name lagged behind.
+- `vallox` CLI: `mode set` now accepts `automatic` (previously only `home`/`away`), and `profile set`/`profile get` recognize `custom`/`CUSTOM` and `automatic`/`AUTOMATIC`.
+- `MockValloxServer` (`vallox.js/testing`) now accepts a `host` option (default `'127.0.0.1'`, matching prior behavior) so it can bind to `'0.0.0.0'` and accept connections from other hosts — e.g. a Docker container or a browser-driven integration test reaching it via `host.docker.internal`.
+
+### Fixed
+
+- `ValloxClient.getMode()` collapsed any `HOME_AWAY` register value other than `1` (Away) into `Mode.HOME` — including `2` (Automatic), which it would have silently misreported as Home. Now correctly distinguishes all three.
+- `vallox` CLI: `mode get` labeled any mode other than Away as `"home"`, including Automatic. `mode set <name>` silently coerced any unrecognized argument (including `automatic`, before this release added support for it) to `home` instead of reporting an error.
+
+### Deprecated
+
+- `Profile.FIREPLACE`, in favor of `Profile.CUSTOM` (same value — no behavior change, no migration required beyond preferring the new name in new code).
+
 ## [1.5.0] - 2026-08-31
 
 ### Added
@@ -89,7 +107,8 @@ Initial release.
   - `ModbusRtuTransport` — standard Modbus RTU over RS-485 (any Node.js `Duplex` stream, e.g. a serial port)
 - `vallox` CLI for direct shell use, covering all of the above, plus `--json` output and a WebSocket-only history log command (`history`, with CSV export).
 
-[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/simonarnell/vallox.js/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/simonarnell/vallox.js/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/simonarnell/vallox.js/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/simonarnell/vallox.js/compare/v1.2.1...v1.3.0

@@ -74,9 +74,9 @@ vallox -H 192.168.1.100 history --csv > history.csv   # wide format: one row per
 | Command | Description |
 |---|---|
 | `power status\|on\|off` | Power control |
-| `profile get` | Current profile (HOME/AWAY/BOOST/FIREPLACE/EXTRA) |
-| `profile set <name> [-d <min>]` | Set profile; `-d` sets duration for timed profiles |
-| `mode get\|set <home\|away>` | Basic Home/Away mode (does not clear timed overrides) |
+| `profile get` | Current profile (HOME/AWAY/BOOST/CUSTOM/EXTRA/AUTOMATIC) |
+| `profile set <name> [-d <min>]` | Set profile (none\|home\|away\|boost\|custom\|extra\|automatic); `-d` sets duration for timed profiles |
+| `mode get\|set <home\|away\|automatic>` | Basic Home/Away/Automatic mode (does not clear timed overrides) |
 | `sensors` | All sensor readings (temps, humidity, CO₂) |
 | `fan get\|set <profile> [%]` | Fan speed; profiles: home/away/boost/custom-extract/custom-supply |
 | `temp get\|set <profile> [°C]` | Supply temp setpoint; profiles: home/away/boost/custom |
@@ -123,198 +123,37 @@ const client = new ValloxClient(transport)
 
 ## API
 
-### Power
+Quick taste — everything on `ValloxClient` follows this shape:
 
 ```typescript
-await client.isPoweredOn()          // boolean
-await client.powerOn()
-await client.powerOff()
-```
+import { Mode, Profile } from 'vallox.js'
 
-### Mode
-
-```typescript
-import { Mode } from 'vallox.js'
-
-await client.getMode()              // Mode.HOME | Mode.AWAY
-await client.setMode(Mode.AWAY)
-```
-
-### Profile (high-level shortcut)
-
-```typescript
-import { Profile } from 'vallox.js'
-
-await client.getProfile()           // Profile.HOME | AWAY | BOOST | FIREPLACE | EXTRA | NONE
-await client.setProfile(Profile.BOOST)
+await client.isPoweredOn()                   // boolean
+await client.getSensorReadings()             // { extractAirTemp, humidity, co2, ... }
+await client.getProfile()                    // Profile.HOME | AWAY | BOOST | CUSTOM | EXTRA | AUTOMATIC | NONE
 await client.setProfile(Profile.BOOST, 30)   // 30-minute boost
-await client.setProfile(Profile.HOME)
+await client.setMode(Mode.AUTOMATIC)         // unit adjusts fan speed itself (firmware 3.1.4+)
 ```
 
-### Timed modes
+Full method-by-method reference, including fan speeds, temperature setpoints, faults, filter maintenance, the weekly schedule, raw register access, and the WebSocket-only history log:
+
+**→ [API documentation](https://simonarnell.github.io/Vallox.js/)**
+
+(Generated from the JSDoc comments in `src/` — see [Maintenance](#api-documentation) below for how it's built.)
+
+### Testing your own code against this library
 
 ```typescript
-await client.setBoostMode()         // indefinite
-await client.setBoostMode(30)       // 30 minutes
-await client.setCustomMode(45)      // fireplace/custom mode
-await client.setProgrammableMode()  // extra/programmable mode
-await client.clearTimedModes()      // return to base Home/Away
+import { MockValloxServer } from 'vallox.js/testing'
 
-await client.getBoostTimer()        // remaining minutes (0 = inactive, 65535 = indefinite)
-await client.getCustomTimer()
-await client.getProgrammableTimer()
+const server = new MockValloxServer() // real WebSocket server, defaults matching a healthy unit
+await server.start()
+const client = new ValloxClient(new WebSocketTransport({ host: server.host, port: server.port }))
+// ... exercise your own code against `client` ...
+await server.stop()
 ```
 
-### Sensor readings
-
-All temperatures are in **degrees Celsius**, humidity in **%**, CO₂ in **PPM**.
-
-```typescript
-const readings = await client.getSensorReadings()
-// {
-//   extractAirTemp: number,      // air leaving rooms
-//   exhaustAirTemp: number,      // air expelled outdoors
-//   outdoorAirTemp: number,      // incoming fresh air
-//   supplyCellAirTemp: number,   // air at HR cell output
-//   supplyAirTemp: number,       // air delivered to rooms
-//   humidity: number,
-//   co2: number,
-// }
-```
-
-### Fan speeds
-
-Values are percentages (0–100).
-
-```typescript
-await client.getHomeFanSpeed()
-await client.getAwayFanSpeed()
-await client.getBoostFanSpeed()
-await client.getCustomExtractFanSpeed()
-await client.getCustomSupplyFanSpeed()
-
-await client.setHomeFanSpeed(70)
-await client.setAwayFanSpeed(30)
-await client.setBoostFanSpeed(100)
-await client.setCustomExtractFanSpeed(55)
-await client.setCustomSupplyFanSpeed(55)
-```
-
-### Supply air temperature setpoints
-
-Values are in **degrees Celsius**.
-
-```typescript
-await client.getHomeSupplyTemp()
-await client.getAwaySupplyTemp()
-await client.getBoostSupplyTemp()
-await client.getCustomSupplyTemp()
-
-await client.setHomeSupplyTemp(20)
-await client.setAwaySupplyTemp(17)
-await client.setBoostSupplyTemp(22)
-await client.setCustomSupplyTemp(18)
-```
-
-### RH / CO₂ thresholds
-
-```typescript
-await client.getRhThreshold()       // percent
-await client.setRhThreshold(70)
-
-await client.getCo2Threshold()      // PPM
-await client.setCo2Threshold(900)
-```
-
-### Heat recovery cell status
-
-```typescript
-import { HrCellStatus } from 'vallox.js'
-
-await client.getHrCellStatus()
-// HrCellStatus.HEAT_RECOVERY | COOL_RECOVERY | BYPASS | DEFROSTING
-```
-
-### Defrost
-
-```typescript
-await client.isDefrosting()         // boolean
-await client.startDefrost()
-await client.stopDefrost()
-```
-
-### Faults
-
-```typescript
-await client.getCriticalFaultActive()   // boolean
-await client.getFaultCount()            // number (capped at 10)
-
-const faults = await client.getFaults()
-// Array of { index, code, description, isActive }
-
-await client.acknowledgeFault(0)        // zero-based index
-```
-
-### Filter maintenance
-
-```typescript
-await client.getFilterDaysRemaining()
-await client.setFilterChanged()         // defaults to today
-await client.setFilterChanged(new Date('2024-03-15'))
-```
-
-### Weekly schedule
-
-```typescript
-const schedule = await client.getWeeklySchedule()
-// {
-//   monday: [0, 1, 1, 0, ...],   // 24 slots, 0=None 1=Home 2=Away 3=Boost
-//   tuesday: [...],
-//   ...
-//   sunday: [...],
-// }
-
-await client.setWeeklySchedule(schedule)
-await client.setWeeklyTimerEnabled(true)
-```
-
-### Device clock
-
-```typescript
-await client.getDeviceTime()            // Date
-await client.setDeviceTime(new Date())
-```
-
-### Raw register access
-
-```typescript
-import { Registers } from 'vallox.js'
-
-await client.readRegister(Registers.FAN_SPEED)
-await client.writeRegister(Registers.HOME_SPEED, 70)
-```
-
-### History log (WS transport only)
-
-Not part of the documented Modbus RTU register map — reverse-engineered from
-the unit's own web UI. Available directly on `WebSocketTransport` (there's no
-equivalent over Modbus RTU, so it isn't exposed through `ValloxClient`).
-
-```typescript
-import { WebSocketTransport, HistoryChannel } from 'vallox.js'
-
-const transport = new WebSocketTransport({ host: '192.168.1.100', port: 80 })
-const samples = await transport.getHistory()
-// [{ channel: HistoryChannel.EXTRACT_AIR_TEMP, timestamp: Date, value: 29815 }, ...]
-```
-
-Each channel is a fixed-size ring buffer (several weeks of periodic samples,
-10-minute intervals observed on a real unit), so samples come back in
-on-device write order, not chronological order — sort by `timestamp` if you
-need them in time order. Temperature channels (`EXTRACT_AIR_TEMP`,
-`EXHAUST_AIR_TEMP`, `OUTDOOR_AIR_TEMP`, `SUPPLY_AIR_TEMP`) are in
-centikelvin, matching the live sensor registers; the rest (`MAX_CO2`,
-`MAX_HUMIDITY`, `FAN_SPEED`, RPM/airflow channels, etc.) are raw values.
+A real WebSocket server speaking the same READ_TABLES/WRITE_DATA/LOG_RAW binary protocol as a physical unit — for integration-testing code that depends on this library (like [`homebridge-vallox-redux`](https://github.com/simonarnell/homebridge-vallox-redux)) against a real socket instead of a hand-mocked transport. `setRegister()`/`getRegister()` read and write its simulated register state directly; `setHistory()` seeds what a `getHistory()` call returns.
 
 ## Maintenance
 
@@ -345,6 +184,26 @@ Output is written to `dist/`.
 npm test
 ```
 
+Runs the full suite against `MockValloxServer` — always CI-safe, no real hardware needed.
+
+```bash
+npm run test:coverage
+```
+
+Same suite, plus an HTML coverage report at `coverage/lcov-report/index.html` (file tree, line-by-line hit/miss highlighting) and a text summary in the console. Local only — not published, not committed (see `.gitignore`/`.npmignore`).
+
+```bash
+VALLOX_HOST=192.168.1.100 npm run test:hardware
+```
+
+Runs a separate suite against a **real unit** — the one thing `MockValloxServer` can never prove, since it's just this project's own model of the protocol. Opt-in only (skips cleanly if `VALLOX_HOST` is unset), and never runs in CI — the unit is only reachable on its own LAN. Read-only checks run by default; the power on/off round-trip additionally requires `VALLOX_ALLOW_POWER_TEST=1`, since it briefly stops the unit's real ventilation.
+
+```bash
+VALLOX_HOST=192.168.1.100 npm run test:report
+```
+
+Generates `coverage/test-report.html`: styled like (and reusing the real CSS/markup from) the Istanbul HTML report above, extended with a table of which `ValloxClient`/`WebSocketTransport` methods were *actually hit* — real per-function execution counts from `coverage-final.json` — by the mocked suite and, when `VALLOX_HOST` is set, the real-hardware suite. A method only counts as covered if it was hit during a passing run of that suite; if either suite fails, its column reflects that rather than reporting fabricated coverage. Omit `VALLOX_HOST` to still get the mocked half of the report, with the hardware column honestly marked "not run".
+
 ### API documentation
 
 ```bash
@@ -356,11 +215,13 @@ This runs TypeDoc via `npx` against a pinned TypeDoc/TypeScript pair rather than
 project devDependency: the project's own `typescript` is pinned to an early 7.x preview
 that doesn't yet expose the Compiler API TypeDoc depends on.
 
+Published automatically to **[simonarnell.github.io/Vallox.js](https://simonarnell.github.io/Vallox.js/)** by [`.github/workflows/docs.yml`](.github/workflows/docs.yml) whenever a GitHub Release is published (same trigger as [`publish.yml`](.github/workflows/publish.yml), so the hosted docs and the npm package always describe the same released API — never an unreleased/in-progress one) — running `npm run docs` locally is only needed to preview changes before pushing.
+
 ### Publishing
 
 1. Bump the version in `package.json`
 2. Build and verify: `npm run build && npm test`
-3. Publish: `npm publish`
+3. Commit, push, and [create a GitHub Release](https://github.com/simonarnell/vallox.js/releases/new) with a `vX.Y.Z` tag matching the version — this triggers [`publish.yml`](.github/workflows/publish.yml), which publishes to npm via [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC; no token to manage) and deploys the updated API docs. `npm publish` is not run locally — the package's Trusted Publisher on npm is scoped to that workflow specifically.
 
 ## Credits
 

@@ -230,6 +230,12 @@ describe('ValloxClient – mode', () => {
     expect(await client.getMode()).toBe(Mode.AWAY)
   })
 
+  it('getMode returns AUTOMATIC when register is 2', async () => {
+    const transport = makeMockTransport({ [Registers.HOME_AWAY]: 2 })
+    const client = new ValloxClient(transport)
+    expect(await client.getMode()).toBe(Mode.AUTOMATIC)
+  })
+
   it('getMode returns HOME for unrecognised values', async () => {
     const transport = makeMockTransport({ [Registers.HOME_AWAY]: 99 })
     const client = new ValloxClient(transport)
@@ -285,6 +291,18 @@ describe('ValloxClient – timed modes', () => {
     expect(transport.writeRegister).toHaveBeenCalledWith(Registers.PROG_INPUT_TIMER, 65535)
   })
 
+  it('getCustomTimer reads CUSTOM_TIMER register', async () => {
+    const transport = makeMockTransport({ [Registers.CUSTOM_TIMER]: 45 })
+    const client = new ValloxClient(transport)
+    expect(await client.getCustomTimer()).toBe(45)
+  })
+
+  it('getProgrammableTimer reads PROG_INPUT_TIMER register', async () => {
+    const transport = makeMockTransport({ [Registers.PROG_INPUT_TIMER]: 120 })
+    const client = new ValloxClient(transport)
+    expect(await client.getProgrammableTimer()).toBe(120)
+  })
+
   it('clearTimedModes writes 0 to all timer registers', async () => {
     const transport = makeMockTransport()
     const client = new ValloxClient(transport)
@@ -314,8 +332,9 @@ describe('ValloxClient – getProfile', () => {
     expect(await new ValloxClient(transport).getProfile()).toBe(Profile.BOOST)
   })
 
-  it('returns FIREPLACE when only custom timer > 0', async () => {
+  it('returns CUSTOM (same value as the deprecated FIREPLACE) when only custom timer > 0', async () => {
     const transport = makeProfileTransport(0, 30, 0, Mode.HOME)
+    expect(await new ValloxClient(transport).getProfile()).toBe(Profile.CUSTOM)
     expect(await new ValloxClient(transport).getProfile()).toBe(Profile.FIREPLACE)
   })
 
@@ -329,6 +348,11 @@ describe('ValloxClient – getProfile', () => {
     expect(await new ValloxClient(transport).getProfile()).toBe(Profile.AWAY)
   })
 
+  it('returns AUTOMATIC when no timers active and mode is AUTOMATIC', async () => {
+    const transport = makeProfileTransport(0, 0, 0, Mode.AUTOMATIC)
+    expect(await new ValloxClient(transport).getProfile()).toBe(Profile.AUTOMATIC)
+  })
+
   it('returns HOME when no timers active and mode is HOME', async () => {
     const transport = makeProfileTransport(0, 0, 0, Mode.HOME)
     expect(await new ValloxClient(transport).getProfile()).toBe(Profile.HOME)
@@ -337,6 +361,11 @@ describe('ValloxClient – getProfile', () => {
   it('BOOST takes priority over other active timers', async () => {
     const transport = makeProfileTransport(10, 10, 10, Mode.HOME)
     expect(await new ValloxClient(transport).getProfile()).toBe(Profile.BOOST)
+  })
+
+  it('returns NONE when no timers active and mode register is an unrecognised value', async () => {
+    const transport = makeProfileTransport(0, 0, 0, 99)
+    expect(await new ValloxClient(transport).getProfile()).toBe(Profile.NONE)
   })
 })
 
@@ -365,11 +394,25 @@ describe('ValloxClient – setProfile', () => {
     expect(transport.writeRegister).toHaveBeenCalledWith(Registers.BOOST_TIMER, 30)
   })
 
-  it('setProfile FIREPLACE activates custom mode', async () => {
+  it('setProfile AUTOMATIC clears timers and sets AUTOMATIC mode', async () => {
     const transport = makeMockTransport()
     const client = new ValloxClient(transport)
-    await client.setProfile(Profile.FIREPLACE)
+    await client.setProfile(Profile.AUTOMATIC)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.BOOST_TIMER, 0)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.CUSTOM_TIMER, 0)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.PROG_INPUT_TIMER, 0)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.HOME_AWAY, Mode.AUTOMATIC)
+  })
+
+  it('setProfile CUSTOM (and the deprecated FIREPLACE alias) activates custom mode', async () => {
+    const transport = makeMockTransport()
+    const client = new ValloxClient(transport)
+    await client.setProfile(Profile.CUSTOM)
     expect(transport.writeRegister).toHaveBeenCalledWith(Registers.CUSTOM_TIMER, 65535)
+
+    const transport2 = makeMockTransport()
+    await new ValloxClient(transport2).setProfile(Profile.FIREPLACE)
+    expect(transport2.writeRegister).toHaveBeenCalledWith(Registers.CUSTOM_TIMER, 65535)
   })
 
   it('setProfile EXTRA activates programmable mode', async () => {
@@ -462,6 +505,17 @@ describe('ValloxClient – fan speeds', () => {
     await new ValloxClient(transport).setCustomSupplyFanSpeed(60)
     expect(transport.writeRegister).toHaveBeenCalledWith(Registers.CUSTOM_SUPPLY_SPEED, 60)
   })
+
+  it('getCustomSupplyFanSpeed reads CUSTOM_SUPPLY_SPEED register', async () => {
+    const transport = makeMockTransport({ [Registers.CUSTOM_SUPPLY_SPEED]: 65 })
+    expect(await new ValloxClient(transport).getCustomSupplyFanSpeed()).toBe(65)
+  })
+
+  it('setCustomExtractFanSpeed writes to CUSTOM_EXTRACT_SPEED register', async () => {
+    const transport = makeMockTransport()
+    await new ValloxClient(transport).setCustomExtractFanSpeed(50)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.CUSTOM_EXTRACT_SPEED, 50)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -494,6 +548,17 @@ describe('ValloxClient – supply temperatures', () => {
     const transport = makeMockTransport()
     await new ValloxClient(transport).setBoostSupplyTemp(22)
     expect(transport.writeRegister).toHaveBeenCalledWith(Registers.BOOST_SUPPLY_TEMP, 29515)
+  })
+
+  it('getCustomSupplyTemp reads and converts from cK', async () => {
+    const transport = makeMockTransport({ [Registers.CUSTOM_SUPPLY_TEMP]: 29215 })
+    expect(await new ValloxClient(transport).getCustomSupplyTemp()).toBeCloseTo(19, 1)
+  })
+
+  it('setCustomSupplyTemp converts Celsius to cK', async () => {
+    const transport = makeMockTransport()
+    await new ValloxClient(transport).setCustomSupplyTemp(17)
+    expect(transport.writeRegister).toHaveBeenCalledWith(Registers.CUSTOM_SUPPLY_TEMP, 29015)
   })
 })
 

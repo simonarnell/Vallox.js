@@ -63,8 +63,10 @@ const PROFILE_NAMES: Record<string, Profile> = {
   home: Profile.HOME,
   away: Profile.AWAY,
   boost: Profile.BOOST,
-  fireplace: Profile.FIREPLACE,
+  custom: Profile.CUSTOM,
+  fireplace: Profile.FIREPLACE, // deprecated alias for 'custom' — same underlying profile
   extra: Profile.EXTRA,
+  automatic: Profile.AUTOMATIC,
 }
 
 const PROFILE_LABELS: Record<number, string> = {
@@ -72,8 +74,9 @@ const PROFILE_LABELS: Record<number, string> = {
   [Profile.HOME]: 'HOME',
   [Profile.AWAY]: 'AWAY',
   [Profile.BOOST]: 'BOOST',
-  [Profile.FIREPLACE]: 'FIREPLACE',
+  [Profile.CUSTOM]: 'CUSTOM',
   [Profile.EXTRA]: 'EXTRA',
+  [Profile.AUTOMATIC]: 'AUTOMATIC',
 }
 
 const HR_CELL_LABELS: Record<number, string> = {
@@ -153,7 +156,7 @@ profileCmd.command('get')
   })
 
 profileCmd.command('set')
-  .description('Set profile (none|home|away|boost|fireplace|extra)')
+  .description('Set profile (none|home|away|boost|custom|extra|automatic)')
   .argument('<profile>', 'profile name')
   .option('-d, --duration <minutes>', 'duration in minutes for timed profiles', parseIntArg)
   .action(async (profileName: string, cmdOpts: { duration?: number }) => {
@@ -171,22 +174,38 @@ profileCmd.command('set')
 // mode
 // ---------------------------------------------------------------------------
 
-const modeCmd = program.command('mode').description('Basic ventilation mode (home/away)')
+const MODE_NAMES: Record<string, Mode> = {
+  home: Mode.HOME,
+  away: Mode.AWAY,
+  automatic: Mode.AUTOMATIC,
+}
+const MODE_LABELS: Record<number, string> = {
+  [Mode.HOME]: 'home',
+  [Mode.AWAY]: 'away',
+  [Mode.AUTOMATIC]: 'automatic',
+}
+
+const modeCmd = program.command('mode').description('Basic ventilation mode (home/away/automatic)')
 
 modeCmd.command('get')
   .description('Get current mode')
   .action(async () => {
     const opts = program.opts<{ host: string; port: number; json: boolean }>()
     const m = await makeClient(opts).getMode()
-    output(opts.json ? m : (m === Mode.AWAY ? 'away' : 'home'), opts.json)
+    output(opts.json ? m : MODE_LABELS[m], opts.json)
   })
 
 modeCmd.command('set')
-  .description('Set mode (home|away)')
-  .argument('<mode>', 'home or away')
+  .description('Set mode (home|away|automatic)')
+  .argument('<mode>', 'home, away, or automatic')
   .action(async (modeName: string) => {
     const opts = program.opts<{ host: string; port: number; json: boolean }>()
-    const m = modeName.toLowerCase() === 'away' ? Mode.AWAY : Mode.HOME
+    const m = MODE_NAMES[modeName.toLowerCase()]
+    if (m === undefined) {
+      console.error(`Unknown mode: ${modeName}. Valid: ${Object.keys(MODE_NAMES).join(', ')}`)
+      process.exitCode = 1
+      return
+    }
     await makeClient(opts).setMode(m)
     output('ok', opts.json)
   })
