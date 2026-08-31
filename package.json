@@ -1,6 +1,6 @@
 {
   "name": "vallox.js",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "TypeScript library for Vallox ventilation units",
   "type": "module",
   "main": "dist/index.js",
@@ -12,6 +12,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./testing": {
+      "import": "./dist/testing/mock-server.js",
+      "types": "./dist/testing/mock-server.d.ts"
     }
   },
   "engines": {
@@ -46,7 +50,7 @@
   "dependencies": {
     "ajv": "^8.20.0",
     "commander": "^14.0.3",
-    "ws": "^7.3.1"
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

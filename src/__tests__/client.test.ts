@@ -92,7 +92,25 @@ describe('ValloxClient – unit identity', () => {
     expect(serial).toBe('0x000100ab')
   })
 
-  it('getSerialNumberDecimal assembles a decimal string from the MSW/LSW register pair', async () => {
+  it("getSerialNumber('decimal') assembles a decimal string from the MSW/LSW register pair", async () => {
+    const transport = makeMockTransport({
+      [Registers.SERIAL_NUMBER_MSW]: 0x9675,
+      [Registers.SERIAL_NUMBER_LSW]: 0x2ecd,
+    })
+    const serial = await new ValloxClient(transport).getSerialNumber('decimal')
+    expect(serial).toBe('2524262093')
+  })
+
+  it("getSerialNumber('hex') is equivalent to the no-argument default", async () => {
+    const transport = makeMockTransport({
+      [Registers.SERIAL_NUMBER_MSW]: 0x9675,
+      [Registers.SERIAL_NUMBER_LSW]: 0x2ecd,
+    })
+    const serial = await new ValloxClient(transport).getSerialNumber('hex')
+    expect(serial).toBe('0x96752ecd')
+  })
+
+  it('getSerialNumberDecimal (deprecated) delegates to getSerialNumber(\'decimal\')', async () => {
     const transport = makeMockTransport({
       [Registers.SERIAL_NUMBER_MSW]: 0x9675,
       [Registers.SERIAL_NUMBER_LSW]: 0x2ecd,

@@ -247,29 +247,31 @@ export class ValloxClient {
   // ---------------------------------------------------------------------------
 
   /**
-   * Returns the unit's serial number as a hex string (e.g. "0x96752ecd"),
-   * assembled from the SERIAL_NUMBER_MSW/LSW register pair.
+   * Returns the unit's serial number, assembled from the SERIAL_NUMBER_MSW/LSW
+   * register pair.
+   *
+   * @param base  `'hex'` (default) returns e.g. "0x96752ecd"; `'decimal'`
+   *              returns e.g. "2524262093", matching how the unit's own
+   *              dashboard ("Unit information" page) displays it.
    */
-  async getSerialNumber(): Promise<string> {
+  async getSerialNumber(base?: 'hex'): Promise<string>
+  async getSerialNumber(base: 'decimal'): Promise<string>
+  async getSerialNumber(base: 'hex' | 'decimal' = 'hex'): Promise<string> {
     const [msw, lsw] = await Promise.all([
       this.#transport.readRegister(Registers.SERIAL_NUMBER_MSW),
       this.#transport.readRegister(Registers.SERIAL_NUMBER_LSW),
     ])
-    return `0x${msw.toString(16).padStart(4, '0')}${lsw.toString(16).padStart(4, '0')}`
+    return base === 'decimal'
+      ? (msw * 0x10000 + lsw).toString(10)
+      : `0x${msw.toString(16).padStart(4, '0')}${lsw.toString(16).padStart(4, '0')}`
   }
 
   /**
-   * Returns the unit's serial number as a decimal string (e.g. "2524262093"),
-   * assembled from the SERIAL_NUMBER_MSW/LSW register pair. Same underlying
-   * value as `getSerialNumber()`, just formatted the way the unit's own
-   * dashboard ("Unit information" page) displays it, rather than as hex.
+   * @deprecated Use `getSerialNumber('decimal')` instead. Kept for backward
+   * compatibility; will be removed in a future major version.
    */
   async getSerialNumberDecimal(): Promise<string> {
-    const [msw, lsw] = await Promise.all([
-      this.#transport.readRegister(Registers.SERIAL_NUMBER_MSW),
-      this.#transport.readRegister(Registers.SERIAL_NUMBER_LSW),
-    ])
-    return (msw * 0x10000 + lsw).toString(10)
+    return this.getSerialNumber('decimal')
   }
 
   /**

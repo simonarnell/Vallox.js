@@ -2,20 +2,20 @@ import WebSocket from 'ws'
 import type { HistoryChannel, HistorySample, Transport, WebSocketTransportConfig } from '../types.js'
 
 /** Total number of uint16 values in a READ_TABLES response. */
-const WS_BUFFER_SIZE = 705
+export const WS_BUFFER_SIZE = 705
 
 /** WebSocket command: read all register tables in one shot. */
-const WS_COMMAND_READ_TABLES = 246
+export const WS_COMMAND_READ_TABLES = 246
 
 /** WebSocket command: write one or more register values. */
-const WS_COMMAND_WRITE_DATA = 249
+export const WS_COMMAND_WRITE_DATA = 249
 
 /**
  * WebSocket command: dump the unit's raw per-minute history log buffers.
  * Reverse-engineered from the unit's own web UI (`WS_WEB_UI_COMMAND_LOG_RAW`
  * in its `bundle.js`) — undocumented in the Modbus RTU manual.
  */
-const WS_COMMAND_LOG_RAW = 243
+export const WS_COMMAND_LOG_RAW = 243
 
 /**
  * Size in bytes of one history log page/channel buffer. The unit sends up to
@@ -25,14 +25,14 @@ const WS_COMMAND_LOG_RAW = 243
  * confirmed against the unit's own web UI source, which reserves it for a
  * variant airflow-diagnostics channel not present on all units/configs).
  */
-const LOG_PAGE_SIZE = 65536
-const LOG_PAGE_OFFSETS = [0, 1, 2, 3, 4, 5, 8].map((i) => i * LOG_PAGE_SIZE)
+export const LOG_PAGE_SIZE = 65536
+export const LOG_PAGE_OFFSETS = [0, 1, 2, 3, 4, 5, 8].map((i) => i * LOG_PAGE_SIZE)
 
 /** Byte size of one history log record: [channel, minute, hour, day, month, year, valueLo, valueHi]. */
-const LOG_RECORD_SIZE = 8
+export const LOG_RECORD_SIZE = 8
 
 /** Record channel byte value marking "no more records" for the rest of a page. */
-const LOG_END_MARKER = 255
+export const LOG_END_MARKER = 255
 
 /**
  * Describes one contiguous block of Modbus registers within the WS response buffer.
@@ -44,7 +44,7 @@ const LOG_END_MARKER = 255
  * For a register address `a` in (rangeStart, rangeEnd]:
  *   bufferIndex = a - rangeStart + bufferStart - 1
  */
-interface BufferRegion {
+export interface BufferRegion {
   /** Human-readable description of the registers contained in this region. */
   readonly name: string
   /** Exclusive lower bound of the Modbus register address range. */
@@ -66,7 +66,7 @@ interface BufferRegion {
 /**
  * All register groups present in the READ_TABLES response buffer, in layout order.
  */
-const WS_REGIONS: ReadonlyArray<BufferRegion> = [
+export const WS_REGIONS: ReadonlyArray<BufferRegion> = [
   // Unit identity and firmware version (addresses 1–35)
   { name: 'unit_info',       rangeStart: 0,     rangeEnd: 35,    bufferStart: 1   },
   // Control panel identity and firmware version (addresses 257–282)
@@ -99,7 +99,7 @@ const WS_REGIONS: ReadonlyArray<BufferRegion> = [
  * Maps a Modbus register address to its index in the WS receive buffer.
  * Returns -1 if the address does not fall within any known region.
  */
-function addressToBufferIndex(address: number): number {
+export function addressToBufferIndex(address: number): number {
   for (const { rangeStart, rangeEnd, bufferStart } of WS_REGIONS) {
     if (address > rangeStart && address <= rangeEnd) {
       return address - rangeStart + bufferStart - 1
