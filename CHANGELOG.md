@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- `FAULT_DESCRIPTIONS` entries were unverifiable against any authoritative source and some didn't match genuine firmware text. Replaced with 7 entries confirmed directly from the unit's firmware (`HSWUPD.BIN`, unpacked with [hn/vallox-ventilation-unit](https://github.com/hn/vallox-ventilation-unit)'s `unpack-vallox-firmware.pl`); the rest correctly resolve to `'Unknown fault'`, matching the unit's own web UI, which shows no description for most codes either.
+
 ## [1.7.0] - 2026-08-31
 
 ### Added

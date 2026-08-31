@@ -672,9 +672,9 @@ describe('ValloxClient – faults', () => {
   it('getFaults returns correct fault entries', async () => {
     const registers: Record<number, number> = {
       [Registers.TOTAL_FAULT_COUNT]: 2,
-      [faultCodeRegister(1)]: 1,      // Extract fan failure
+      [faultCodeRegister(1)]: 11,     // High supply air temperature
       [faultActivityRegister(1)]: 0,  // 0 = active
-      [faultCodeRegister(2)]: 5,      // Outdoor air temp sensor failure
+      [faultCodeRegister(2)]: 23,     // Low supply air temperature
       [faultActivityRegister(2)]: 1,  // 1 = solved
     }
     const transport = makeMockTransport(registers)
@@ -683,13 +683,13 @@ describe('ValloxClient – faults', () => {
     expect(faults).toHaveLength(2)
 
     expect(faults[0].index).toBe(0)
-    expect(faults[0].code).toBe(1)
-    expect(faults[0].description).toBe('Extract fan failure')
+    expect(faults[0].code).toBe(11)
+    expect(faults[0].description).toBe('High supply air temperature')
     expect(faults[0].isActive).toBe(true)   // activity=0 means active
 
     expect(faults[1].index).toBe(1)
-    expect(faults[1].code).toBe(5)
-    expect(faults[1].description).toBe('Outdoor air temp sensor failure')
+    expect(faults[1].code).toBe(23)
+    expect(faults[1].description).toBe('Low supply air temperature')
     expect(faults[1].isActive).toBe(false)  // activity=1 means solved
   })
 

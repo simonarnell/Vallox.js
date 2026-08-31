@@ -204,24 +204,37 @@ export interface WebSocketTransportConfig {
 }
 
 /**
- * Fault code to description mapping from the Vallox Modbus manual.
- * Only codes documented in the manual are listed; all others are 'Unknown fault'.
+ * Fault code to description mapping.
+ *
+ * Neither the Vallox Modbus manual nor the unit's own web UI resolve fault
+ * codes to descriptive text — the unit's own fault log (both the web UI and,
+ * per the manual, the physical control panel) shows only the bare numeric
+ * code, severity, dates, and occurrence count. There is no general-purpose
+ * code-to-text lookup built into the product for most codes.
+ *
+ * These entries are reverse-engineered from literal strings found in the
+ * unit's firmware (`HSWUPD.BIN`, panel-text data block), each confirmed to
+ * sit alongside genuine error/alert UI strings (e.g. "Error message"),
+ * rather than being generic catalog entries — they correspond to a handful
+ * of specific, common/critical alert conditions that get dedicated banner
+ * text elsewhere in the UI, not a per-code description table. Codes 3 and 9
+ * are included with lower confidence: the exact wording was found in the
+ * firmware, but in a section related to CFI airflow-sensor diagnostics
+ * rather than clearly alongside the other alert strings, so it's plausible
+ * but unconfirmed that this is really what shows for that fault code.
+ *
+ * All other codes — including ones known to be real and reachable in current
+ * firmware (13–22 and 24, from a "Tornado" post-heater subsystem) — have no
+ * recoverable description from any source checked (official manuals current
+ * and historical, the web UI, community integrations, or the firmware
+ * itself) and correctly resolve to 'Unknown fault'.
  */
 export const FAULT_DESCRIPTIONS: Readonly<Record<number, string>> = {
-  0: 'No fault',
-  1: 'Extract fan failure',
-  2: 'Supply fan failure',
   3: 'Supply airflow sensor',
-  4: 'Extract air temp sensor failure',
-  5: 'Outdoor air temp sensor failure',
-  6: 'Supply air temp sensor failure',
-  7: 'Exhaust air temp sensor failure',
-  8: 'Supply air from HR cell sensor failure',
   9: 'Extract airflow sensor',
-  10: 'Optional temp sensor failure',
   11: 'High supply air temperature',
-  12: 'Water radiator freezing prevention',
+  12: 'Liquid radiator freezing risk',
   23: 'Low supply air temperature',
-  25: 'Supply airflow not achieved',
-  26: 'Extract airflow not achieved',
+  25: 'Supply airflow not reached',
+  26: 'Extract airflow not reached',
 } as const
