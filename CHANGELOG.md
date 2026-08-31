@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `ScheduleSlot.CUSTOM` (4) and `ScheduleSlot.STANDBY` (5), and a runtime `ScheduleSlot` object (previously a type-only union `0 | 1 | 2 | 3`) mirroring the existing `Mode`/`Profile` pattern. Reverse-engineered from a live unit: clicking through a weekly schedule cell's states while reading back the underlying register showed the cycle is None→Home→Away→Boost→Custom→Standby, six states in total — Automatic is never offered as a schedule slot. `STANDBY` was confirmed to power the unit off for that hour: enabling the weekly schedule with a Standby slot active caused the unit's `ON_OFF` register to flip to `POWER_OFF` within seconds.
+
 ## [1.6.0] - 2026-08-31
 
 ### Added

@@ -32,11 +32,12 @@ const HOURS_PER_DAY = 24
 const HOURS_PER_YEAR = 8760
 
 /**
- * Returns true when a register value is a non-zero ScheduleSlot (1, 2, or 3).
- * TypeScript 5.5 infers the return type as `v is 1 | 2 | 3`, eliminating
- * the need for explicit casts when mapping raw register data to ScheduleSlot.
+ * Returns true when a register value is a non-zero ScheduleSlot (1-5).
+ * TypeScript 5.5 infers the return type as `v is 1 | 2 | 3 | 4 | 5`,
+ * eliminating the need for explicit casts when mapping raw register data
+ * to ScheduleSlot.
  */
-const isNonZeroSlot = (v: number) => v === 1 || v === 2 || v === 3
+const isNonZeroSlot = (v: number) => v === 1 || v === 2 || v === 3 || v === 4 || v === 5
 
 /**
  * High-level API client for Vallox ventilation units.
@@ -650,8 +651,8 @@ export class ValloxClient {
     const toDay = (offset: number): ScheduleDay =>
       Array.from({ length: HOURS_PER_DAY }, (_, h) => {
         const v = raw[offset + h]
-        // isNonZeroSlot is inferred as `v is 1 | 2 | 3` (TS 5.5), so the
-        // ternary resolves to ScheduleSlot (0|1|2|3) without an explicit cast.
+        // isNonZeroSlot is inferred as `v is 1 | 2 | 3 | 4 | 5` (TS 5.5), so
+        // the ternary resolves to ScheduleSlot without an explicit cast.
         return isNonZeroSlot(v) ? v : 0
       }) as ScheduleDay
 

@@ -113,10 +113,25 @@ export type TempControlMethod = typeof TempControlMethod[keyof typeof TempContro
 
 /**
  * A single schedule slot value representing the ventilation profile
- * assigned to that hour of the week.
- * 0=None, 1=Home, 2=Away, 3=Boost
+ * assigned to that hour of the week. Reverse-engineered from a live unit's
+ * web UI (clicking through a schedule cell's states while reading back the
+ * underlying register) — undocumented in the Modbus RTU manual.
+ *
+ * `STANDBY` (5) powers the unit off for that hour: confirmed by watching a
+ * live unit's `ON_OFF` register (see {@link Registers.ON_OFF}) flip to
+ * `POWER_OFF` when a scheduled Standby slot became active. There is no
+ * schedule slot for {@link Mode.AUTOMATIC} — the UI's per-cell click cycle
+ * never offers it.
  */
-export type ScheduleSlot = 0 | 1 | 2 | 3
+export const ScheduleSlot = {
+  NONE: 0,
+  HOME: 1,
+  AWAY: 2,
+  BOOST: 3,
+  CUSTOM: 4,
+  STANDBY: 5,
+} as const satisfies Record<string, number>
+export type ScheduleSlot = typeof ScheduleSlot[keyof typeof ScheduleSlot]
 
 /**
  * 24 hourly schedule slots for one day.

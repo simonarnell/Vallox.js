@@ -10,13 +10,13 @@ export {
   TempControlMethod,
   FAULT_DESCRIPTIONS,
   HistoryChannel,
+  ScheduleSlot,
 } from './types.js'
 export type {
   SensorReadings,
   FaultEntry,
   WeeklySchedule,
   ScheduleDay,
-  ScheduleSlot,
   WebSocketTransportConfig,
   HistorySample,
   UnitUptime,
