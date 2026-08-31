@@ -6,9 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-31
+
 ### Added
 
 - `ScheduleSlot.CUSTOM` (4) and `ScheduleSlot.STANDBY` (5), and a runtime `ScheduleSlot` object (previously a type-only union `0 | 1 | 2 | 3`) mirroring the existing `Mode`/`Profile` pattern. Reverse-engineered from a live unit: clicking through a weekly schedule cell's states while reading back the underlying register showed the cycle is None→Home→Away→Boost→Custom→Standby, six states in total — Automatic is never offered as a schedule slot. `STANDBY` was confirmed to power the unit off for that hour: enabling the weekly schedule with a Standby slot active caused the unit's `ON_OFF` register to flip to `POWER_OFF` within seconds.
+
+### Fixed
+
+- `ValloxClient.getWeeklySchedule()` collapsed any schedule register value other than `1`/`2`/`3` (Home/Away/Boost) into `0` (None) — including `4` (Custom) and `5` (Standby), which it would have silently misreported as an empty slot. Now returns the real value. Callers that treat a schedule slot as a direct index into a fixed 0–3-sized lookup (e.g. an icon/label array sized for the old 4-value range) should size it for 0–5 instead.
 
 ## [1.6.0] - 2026-08-31
 
@@ -111,7 +117,8 @@ Initial release.
   - `ModbusRtuTransport` — standard Modbus RTU over RS-485 (any Node.js `Duplex` stream, e.g. a serial port)
 - `vallox` CLI for direct shell use, covering all of the above, plus `--json` output and a WebSocket-only history log command (`history`, with CSV export).
 
-[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/simonarnell/vallox.js/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/simonarnell/vallox.js/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/simonarnell/vallox.js/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/simonarnell/vallox.js/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/simonarnell/vallox.js/compare/v1.3.0...v1.4.0
